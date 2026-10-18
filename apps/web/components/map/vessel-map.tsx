@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  GeoJSONSource,
   MapLibreMap,
   NavigationControl,
   Popup,
@@ -23,6 +22,7 @@ import {
 } from "@/lib/vessels";
 import { VESSEL_CATEGORIES, type VesselCategory } from "@/lib/vessel-types";
 
+import { useVesselAnimation, type PositionLookup } from "./use-vessel-animation";
 import { VesselFilters } from "./vessel-filters";
 
 import { ARROW_ICON_PIXEL_RATIO, createArrowIcon } from "./vessel-icon";
@@ -340,20 +340,36 @@ export function VesselMap() {
     };
   }, [reloadToken]);
 
-  useEffect(() => {
-    const map = mapReference.current;
-    if (map === null || !isMapReady) return;
-
-    const source = map.getSource(SOURCE_ID);
-    if (source instanceof GeoJSONSource) {
-      source.setData(collection);
-    }
-
-    // El `setData` no toca el popup abierto, así que lo refrescamos con la
-    // nueva posición del mismo MMSI o lo cerramos si el barco ya no viene.
+  // Mientras el barco se desplaza por estima, el popup abierto lo acompaña.
+  const followSelectedVessel = useCallback((lookup: PositionLookup) => {
     const popup = popupReference.current;
     const selectedMmsi = selectedMmsiReference.current;
     if (popup === null || selectedMmsi === null || !popup.isOpen()) return;
+
+    const position = lookup(selectedMmsi);
+    if (position === null) return;
+
+    popup.setLngLat([position.longitude, position.latitude]);
+  }, []);
+
+  // La animación es ahora la única que escribe en el source: traduce estas
+  // posiciones de la API en el desplazamiento continuo que se ve en pantalla.
+  useVesselAnimation({
+    mapReference,
+    sourceId: SOURCE_ID,
+    isMapReady,
+    collection,
+    generatedAt,
+    onPositionsUpdated: followSelectedVessel,
+  });
+
+  // Los datos del popup sí se refrescan con cada tick; la posición la lleva la
+  // animación, así que aquí solo cambia el contenido o se cierra el popup de un
+  // barco que ha dejado de venir.
+  useEffect(() => {
+    const popup = popupReference.current;
+    const selectedMmsi = selectedMmsiReference.current;
+    if (!isMapReady || popup === null || selectedMmsi === null || !popup.isOpen()) return;
 
     const feature = collection.features.find(
       (candidate) => candidate.properties.mmsi === selectedMmsi,
@@ -364,8 +380,7 @@ export function VesselMap() {
       return;
     }
 
-    const [longitude, latitude] = feature.geometry.coordinates;
-    popup.setLngLat([longitude, latitude]).setHTML(renderVesselPopup(feature.properties));
+    popup.setHTML(renderVesselPopup(feature.properties));
   }, [collection, isMapReady]);
 
   useEffect(() => {
