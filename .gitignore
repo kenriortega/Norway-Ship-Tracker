@@ -24,3 +24,6 @@ captures/
 .idea/
 .vscode/
 
+
+# Copia generada del worker de MapLibre (ver apps/web/scripts)
+apps/web/public/maplibre-gl-worker.mjs

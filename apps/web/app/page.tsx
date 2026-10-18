@@ -37,8 +37,8 @@ export default function Home() {
               Drizzle, PostgreSQL/PostGIS y Next.js.
             </p>
           </div>
-          <Badge variant="outline" className="w-fit border-amber-400/40 text-amber-700">
-            Pipeline en integración
+          <Badge variant="outline" className="w-fit border-emerald-500/40 text-emerald-700">
+            Posiciones en vivo
           </Badge>
         </header>
 

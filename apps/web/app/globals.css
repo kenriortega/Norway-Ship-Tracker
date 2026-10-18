@@ -42,3 +42,29 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* El popup de MapLibre viene con fondo blanco; lo alineamos con la paleta
+   oscura del mapa. La clase propia nos da la especificidad necesaria, porque
+   `maplibre-gl.css` se importa después de esta hoja. */
+.vessel-popup .maplibregl-popup-content {
+  padding: 0.75rem 0.875rem;
+  border: 1px solid color-mix(in srgb, white 12%, transparent);
+  border-radius: 0.875rem;
+  background: rgb(7 26 44 / 0.95);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.vessel-popup .maplibregl-popup-tip {
+  display: none;
+}
+
+.vessel-popup .maplibregl-popup-close-button {
+  padding: 0 0.35rem;
+  color: rgb(148 163 184);
+  font-size: 1rem;
+}
+
+.vessel-popup .maplibregl-popup-close-button:hover {
+  background: transparent;
+  color: rgb(226 232 240);
+}
