@@ -1,0 +1,8 @@
+.env
+.git
+.next
+node_modules
+target
+captures
+data
+*.log

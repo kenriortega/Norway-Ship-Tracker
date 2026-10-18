@@ -1,0 +1,26 @@
+# Environment
+.env
+.env.local
+
+# Rust
+target/
+
+# Next.js / Node.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+npm-debug.log*
+pnpm-debug.log*
+
+# Local data and captures
+data/
+captures/
+*.pcap
+*.log
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+

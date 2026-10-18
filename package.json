@@ -1,0 +1,23 @@
+{
+  "name": "norway-ship-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/ingestor",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev:web": "npm run dev --workspace @norway-ship-tracker/web",
+    "dev:ingestor": "npm run dev --workspace @norway-ship-tracker/ingestor",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace @norway-ship-tracker/db",
+    "db:migrate": "npm run db:migrate --workspace @norway-ship-tracker/db"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

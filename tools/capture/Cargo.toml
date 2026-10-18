@@ -1,0 +1,11 @@
+[package]
+name = "ais-capture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = "1"
+norway-ship-tracker-backend = { path = "../../apps/backend" }
+tokio = { version = "1", features = ["fs", "io-util", "macros", "rt-multi-thread", "signal", "sync", "time"] }
+
