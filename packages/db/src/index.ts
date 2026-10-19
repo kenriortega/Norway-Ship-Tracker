@@ -1,4 +1,13 @@
-import type { VesselPositionDto, VesselUpdate } from "@norway-ship-tracker/domain";
+import type {
+  ActivitySample,
+  CoverageCounts,
+  FreshnessBuckets,
+  TrafficCell,
+  VesselBreakdownRow,
+  VesselPositionDto,
+  VesselStatsResponse,
+  VesselUpdate,
+} from "@norway-ship-tracker/domain";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { sql } from "drizzle-orm";
 import postgres from "postgres";
@@ -180,4 +189,149 @@ export async function getLatestVessels(
     observedAt: row.source_timestamp ? toIsoString(row.source_timestamp) : null,
     receivedAt: toIsoString(row.received_at),
   }));
+}
+
+interface BreakdownQueryRow {
+  ship_type: number | null;
+  navigational_status: number | null;
+  vessels: string | number;
+  moving: string | number;
+  average_speed: string | number | null;
+}
+
+interface ActivityQueryRow {
+  minute: Date | string;
+  positions: string | number;
+}
+
+interface TrafficQueryRow {
+  longitude: string | number;
+  latitude: string | number;
+  vessels: string | number;
+}
+
+interface FreshnessQueryRow {
+  under_five_minutes: string | number;
+  under_one_hour: string | number;
+  under_six_hours: string | number;
+  older: string | number;
+  terrestrial: string | number;
+  satellite: string | number;
+}
+
+/** `postgres` devuelve los enteros grandes como texto para no perder precisión. */
+function toNumber(value: string | number): number {
+  return typeof value === "number" ? value : Number(value);
+}
+
+function toNullableNumber(value: string | number | null): number | null {
+  if (value === null) return null;
+  const parsed = toNumber(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Agregados para el panel de métricas. Las cuatro consultas son independientes
+ * y se lanzan a la vez: en serie suman unos 315 ms y en paralelo las domina la
+ * más lenta.
+ *
+ * La ventana de actividad es de una hora fija, así que su coste no crece con
+ * la antigüedad de la tabla, y cuenta posiciones en lugar de barcos distintos
+ * porque el `count(DISTINCT mmsi)` cuadruplica el tiempo sin decir más sobre
+ * el pulso del pipeline.
+ */
+export async function getVesselStats(
+  connection: DatabaseConnection,
+): Promise<Omit<VesselStatsResponse, "generatedAt">> {
+  const [breakdownResult, activityResult, trafficResult, freshnessResult] = await Promise.all([
+    connection.db.execute(sql`
+      SELECT
+        vessel.ship_type,
+        latest.navigational_status,
+        count(*) AS vessels,
+        count(*) FILTER (WHERE latest.speed_over_ground > 0.5) AS moving,
+        avg(latest.speed_over_ground) FILTER (WHERE latest.speed_over_ground > 0.5) AS average_speed
+      FROM vessel_latest_positions AS latest
+      JOIN vessels AS vessel USING (mmsi)
+      GROUP BY vessel.ship_type, latest.navigational_status
+    `),
+    connection.db.execute(sql`
+      SELECT
+        date_trunc('minute', received_at) AS minute,
+        count(*) AS positions
+      FROM vessel_positions
+      WHERE received_at > now() - interval '1 hour'
+        -- El minuto en curso está a medio llenar y dibujaría una caída que no
+        -- ha ocurrido, así que la serie termina en el último minuto cerrado.
+        AND received_at < date_trunc('minute', now())
+      GROUP BY 1
+      ORDER BY 1
+    `),
+    connection.db.execute(sql`
+      SELECT
+        ST_X(ST_SnapToGrid(location::geometry, 0.5)) AS longitude,
+        ST_Y(ST_SnapToGrid(location::geometry, 0.5)) AS latitude,
+        count(*) AS vessels
+      FROM vessel_latest_positions
+      GROUP BY 1, 2
+      ORDER BY vessels DESC
+      LIMIT 8
+    `),
+    connection.db.execute(sql`
+      SELECT
+        count(*) FILTER (WHERE age < interval '5 minutes') AS under_five_minutes,
+        count(*) FILTER (WHERE age >= interval '5 minutes' AND age < interval '1 hour') AS under_one_hour,
+        count(*) FILTER (WHERE age >= interval '1 hour' AND age < interval '6 hours') AS under_six_hours,
+        count(*) FILTER (WHERE age >= interval '6 hours' OR age IS NULL) AS older,
+        count(*) FILTER (WHERE stream = 'terra') AS terrestrial,
+        count(*) FILTER (WHERE stream IS DISTINCT FROM 'terra') AS satellite
+      FROM (
+        SELECT
+          now() - source_timestamp AS age,
+          raw_payload->>'stream' AS stream
+        FROM vessel_latest_positions
+      ) AS positions
+    `),
+  ]);
+
+  const breakdownRows = breakdownResult as unknown as BreakdownQueryRow[];
+  const activityRows = activityResult as unknown as ActivityQueryRow[];
+  const trafficRows = trafficResult as unknown as TrafficQueryRow[];
+  const [freshnessRow] = freshnessResult as unknown as FreshnessQueryRow[];
+
+  const breakdown: VesselBreakdownRow[] = breakdownRows.map((row) => ({
+    shipType: row.ship_type,
+    navigationalStatus: row.navigational_status,
+    vessels: toNumber(row.vessels),
+    moving: toNumber(row.moving),
+    averageSpeed: toNullableNumber(row.average_speed),
+  }));
+
+  const activity: ActivitySample[] = activityRows.map((row) => ({
+    minute: toIsoString(row.minute),
+    positions: toNumber(row.positions),
+  }));
+
+  const traffic: TrafficCell[] = trafficRows.map((row) => ({
+    longitude: toNumber(row.longitude),
+    latitude: toNumber(row.latitude),
+    vessels: toNumber(row.vessels),
+  }));
+
+  const freshness: FreshnessBuckets = {
+    underFiveMinutes: toNumber(freshnessRow?.under_five_minutes ?? 0),
+    underOneHour: toNumber(freshnessRow?.under_one_hour ?? 0),
+    underSixHours: toNumber(freshnessRow?.under_six_hours ?? 0),
+    older: toNumber(freshnessRow?.older ?? 0),
+  };
+
+  const coverage: CoverageCounts = {
+    terrestrial: toNumber(freshnessRow?.terrestrial ?? 0),
+    satellite: toNumber(freshnessRow?.satellite ?? 0),
+  };
+
+  const totalVessels = breakdown.reduce((sum, row) => sum + row.vessels, 0);
+  const movingVessels = breakdown.reduce((sum, row) => sum + row.moving, 0);
+
+  return { totalVessels, movingVessels, breakdown, activity, traffic, freshness, coverage };
 }

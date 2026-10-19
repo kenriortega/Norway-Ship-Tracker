@@ -1,26 +1,6 @@
-import { Activity, Database, Network } from "lucide-react";
-
+import { VesselDashboard } from "@/components/dashboard/vessel-dashboard";
 import { VesselMap } from "@/components/map/vessel-map";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-const pipeline = [
-  {
-    title: "BarentsWatch AIS",
-    description: "Stream oficial autenticado con posiciones AIS normalizadas.",
-    icon: Network,
-  },
-  {
-    title: "TypeScript ingestor",
-    description: "Worker persistente con OAuth, reconexión y parser NDJSON.",
-    icon: Activity,
-  },
-  {
-    title: "PostGIS",
-    description: "Drizzle mantiene la posición actual y el historial muestreado.",
-    icon: Database,
-  },
-];
 
 export default function Home() {
   return (
@@ -44,22 +24,9 @@ export default function Home() {
 
         <VesselMap />
 
-        <section className="mt-8 grid gap-4 md:grid-cols-3" aria-label="Estado del pipeline">
-          {pipeline.map(({ title, description, icon: Icon }) => (
-            <Card key={title}>
-              <CardHeader>
-                <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-secondary">
-                  <Icon className="size-5" aria-hidden="true" />
-                </div>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>{description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Badge variant="outline">Preparado</Badge>
-              </CardContent>
-            </Card>
-          ))}
-        </section>
+        <div className="mt-8">
+          <VesselDashboard />
+        </div>
 
         <footer className="mt-10 border-t border-border pt-5 text-xs leading-5 text-muted-foreground">
           Contiene datos AIS distribuidos por Kystverket bajo NLOD 2.0. Los datos serán
@@ -70,4 +37,3 @@ export default function Home() {
     </main>
   );
 }
-
