@@ -1,6 +1,6 @@
 import type { VesselUpdate } from "@norway-ship-tracker/domain";
 
-import { TokenManager } from "./auth.js";
+import { TokenManager } from "@norway-ship-tracker/barentswatch";
 import { parseNdjsonStream } from "./ndjson.js";
 import { normalizeBarentswatchMessage } from "./normalize.js";
 

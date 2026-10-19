@@ -1,10 +1,10 @@
+import { TokenManager } from "@norway-ship-tracker/barentswatch";
 import {
   closeDatabase,
   createDatabase,
   persistVesselUpdate,
 } from "@norway-ship-tracker/db";
 
-import { TokenManager } from "./barentswatch/auth.js";
 import {
   ingestLatestSnapshot,
   runLiveStream,

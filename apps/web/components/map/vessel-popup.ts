@@ -1,3 +1,4 @@
+import type { VesselTrackState } from "@/lib/vessel-track";
 import type { VesselFeatureProperties } from "@/lib/vessels";
 import { isVesselCategory, VESSEL_CATEGORY_LABELS } from "@/lib/vessel-types";
 
@@ -53,7 +54,30 @@ function renderRow(label: string, value: string): string {
   return `<div class="flex items-baseline justify-between gap-4"><dt class="text-slate-400">${label}</dt><dd class="font-medium text-slate-100">${escapeHtml(value)}</dd></div>`;
 }
 
-export function renderVesselPopup(properties: VesselFeatureProperties): string {
+/**
+ * El recorrido se pide aparte y puede tardar o fallar, así que el popup lo
+ * cuenta en una fila más en lugar de dejar al usuario mirando un mapa sin
+ * línea sin saber por qué. Sin el argumento, el popup se pinta como antes.
+ */
+function formatTrack(track: VesselTrackState | undefined): string {
+  if (track === undefined) return "—";
+
+  switch (track.status) {
+    case "loading":
+      return "cargando…";
+    case "empty":
+      return "sin datos";
+    case "error":
+      return "no disponible";
+    case "ready":
+      return `${track.points.toLocaleString("es-ES")} posiciones`;
+  }
+}
+
+export function renderVesselPopup(
+  properties: VesselFeatureProperties,
+  track?: VesselTrackState,
+): string {
   return [
     '<div class="min-w-[13rem] space-y-2 text-xs">',
     `<p class="text-sm font-semibold text-cyan-300">${escapeHtml(properties.name)}</p>`,
@@ -63,6 +87,7 @@ export function renderVesselPopup(properties: VesselFeatureProperties): string {
     renderRow("Velocidad", formatSpeed(properties.speedOverGround)),
     renderRow("Rumbo", formatHeading(properties)),
     renderRow("Última posición", formatTimestamp(properties.observedAt)),
+    renderRow("Recorrido 24 h", formatTrack(track)),
     "</dl>",
     "</div>",
   ].join("");

@@ -10,6 +10,7 @@
     "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
+    "@norway-ship-tracker/barentswatch": "*",
     "@norway-ship-tracker/db": "*",
     "@norway-ship-tracker/domain": "*",
     "tsx": "^4.20.6"

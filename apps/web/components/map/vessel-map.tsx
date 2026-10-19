@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  GeoJSONSource,
   MapLibreMap,
   NavigationControl,
   Popup,
@@ -20,6 +21,12 @@ import {
   type VesselFeatureCollection,
   type VesselFeatureProperties,
 } from "@/lib/vessels";
+import {
+  EMPTY_TRACK_COLLECTION,
+  fetchVesselTrack,
+  trackToGeoJson,
+  type VesselTrackState,
+} from "@/lib/vessel-track";
 import { VESSEL_CATEGORIES, type VesselCategory } from "@/lib/vessel-types";
 
 import { useVesselAnimation, type PositionLookup } from "./use-vessel-animation";
@@ -27,6 +34,7 @@ import { VesselFilters } from "./vessel-filters";
 
 import { ARROW_ICON_PIXEL_RATIO, createArrowIcon } from "./vessel-icon";
 import { readVesselProperties, renderVesselPopup } from "./vessel-popup";
+import { addVesselTrackLayers, TRACK_SOURCE_ID } from "./vessel-track-layers";
 import { VesselMapStatus } from "./vessel-map-status";
 
 const SOURCE_ID = "vessels";
@@ -160,6 +168,11 @@ export function VesselMap() {
     () => new Set(VESSEL_CATEGORIES),
   );
   const [minSpeed, setMinSpeed] = useState(0);
+  // El MMSI seleccionado vive además en un estado porque el recorrido se pide
+  // en un efecto; la ref la siguen leyendo los callbacks del mapa, que corren
+  // fuera del ciclo de render.
+  const [selectedMmsi, setSelectedMmsi] = useState<number | null>(null);
+  const [trackState, setTrackState] = useState<VesselTrackState | null>(null);
 
   const isFiltered = selectedCategories.size < VESSEL_CATEGORIES.length || minSpeed > 0;
 
@@ -208,6 +221,10 @@ export function VesselMap() {
 
     popup.on("close", () => {
       selectedMmsiReference.current = null;
+      // Cubre de una vez los tres finales posibles: cerrar el popup, clicar
+      // agua y el cierre automático cuando el barco sale del filtro.
+      setSelectedMmsi(null);
+      setTrackState(null);
     });
 
     map.on("load", () => {
@@ -233,6 +250,10 @@ export function VesselMap() {
           "circle-stroke-color": "#0b2b3f",
         },
       });
+
+      // El recorrido va por debajo de los puntos, así que se añade cuando la
+      // capa de círculos ya existe y puede servir de `beforeId`.
+      addVesselTrackLayers(map, ARROW_ICON_ID, CIRCLE_LAYER_ID);
 
       // Va encima de los círculos: los barcos sin rumbo conservan su punto y
       // los que sí lo reportan reciben la flecha sobre él.
@@ -275,7 +296,18 @@ export function VesselMap() {
 
         const [longitude, latitude] = feature.geometry.coordinates;
         selectedMmsiReference.current = properties.mmsi;
-        popup.setLngLat([longitude, latitude]).setHTML(renderVesselPopup(properties)).addTo(map);
+        setSelectedMmsi(properties.mmsi);
+        setTrackState({ mmsi: properties.mmsi, status: "loading", points: 0 });
+        popup
+          .setLngLat([longitude, latitude])
+          .setHTML(
+            renderVesselPopup(properties, {
+              mmsi: properties.mmsi,
+              status: "loading",
+              points: 0,
+            }),
+          )
+          .addTo(map);
       });
 
       map.on("mouseenter", INTERACTIVE_LAYER_IDS, () => {
@@ -297,6 +329,7 @@ export function VesselMap() {
       mapReference.current = null;
       popupReference.current = null;
       selectedMmsiReference.current = null;
+      setSelectedMmsi(null);
       popup.remove();
       map.remove();
     };
@@ -380,8 +413,63 @@ export function VesselMap() {
       return;
     }
 
-    popup.setHTML(renderVesselPopup(feature.properties));
-  }, [collection, isMapReady]);
+    // Un estado de otro barco (o una petición que se quedó por el camino al
+    // cambiar de selección) no se pinta: para este barco seguimos cargando.
+    const track: VesselTrackState =
+      trackState !== null && trackState.mmsi === selectedMmsi
+        ? trackState
+        : { mmsi: selectedMmsi, status: "loading", points: 0 };
+
+    popup.setHTML(renderVesselPopup(feature.properties, track));
+  }, [collection, isMapReady, trackState]);
+
+  // El recorrido se pide una sola vez por selección: 24 h de histórico no
+  // cambian de forma apreciable entre refrescos de 20 s, y el marcador lo
+  // sigue moviendo la interpolación por estima sobre el source de posiciones.
+  useEffect(() => {
+    const map = mapReference.current;
+    if (map === null || !isMapReady) return;
+
+    const source = map.getSource(TRACK_SOURCE_ID);
+    if (!(source instanceof GeoJSONSource)) return;
+
+    source.setData(EMPTY_TRACK_COLLECTION);
+    // El estado "cargando" lo pone el propio clic, y el popup al cerrarse lo
+    // devuelve a null: así este efecto no escribe estado en su cuerpo.
+    if (selectedMmsi === null) return;
+
+    const controller = new AbortController();
+
+    void (async () => {
+      try {
+        const track = await fetchVesselTrack(selectedMmsi, controller.signal);
+        if (controller.signal.aborted) return;
+
+        const collection = trackToGeoJson(track);
+        // El popup cuenta las posiciones que devuelve la API, no los vértices
+        // que quedan tras simplificar la línea.
+        const points = track.points.length;
+
+        source.setData(collection);
+        setTrackState(
+          points === 0
+            ? { mmsi: selectedMmsi, status: "empty", points: 0 }
+            : { mmsi: selectedMmsi, status: "ready", points },
+        );
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        // Un aviso, no un error: el popup ya lo cuenta y una caída del
+        // histórico no rompe el mapa.
+        console.warn("No se pudo cargar el recorrido", error);
+        setTrackState({ mmsi: selectedMmsi, status: "error", points: 0 });
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      source.setData(EMPTY_TRACK_COLLECTION);
+    };
+  }, [isMapReady, selectedMmsi]);
 
   useEffect(() => {
     const map = mapReference.current;

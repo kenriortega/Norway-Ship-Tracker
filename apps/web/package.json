@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@norway-ship-tracker/barentswatch": "*",
     "@norway-ship-tracker/db": "*",
     "@norway-ship-tracker/domain": "*",
     "@radix-ui/react-slider": "^1.6.1",

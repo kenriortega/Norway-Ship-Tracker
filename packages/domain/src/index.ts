@@ -39,3 +39,17 @@ export interface VesselPositionsResponse {
   count: number;
   generatedAt: string;
 }
+
+/** Una posición del recorrido histórico de un barco, ya ordenada por tiempo. */
+export interface VesselTrackPoint {
+  longitude: number;
+  latitude: number;
+  observedAt: string;
+  speedOverGround: number | null;
+}
+
+export interface VesselTrackResponse {
+  mmsi: number;
+  points: VesselTrackPoint[];
+  generatedAt: string;
+}
