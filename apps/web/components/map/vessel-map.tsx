@@ -12,6 +12,8 @@ import {
 } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { AnalysisLayers } from "./analysis-layers";
+
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import {
@@ -158,6 +160,10 @@ export function VesselMap() {
   const selectedMmsiReference = useRef<number | null>(null);
 
   const [isMapReady, setIsMapReady] = useState(false);
+  // Las capas de análisis necesitan la instancia durante el render, y un ref
+  // no se puede leer ahí sin romper el ciclo de React, así que el mapa vive
+  // también en un estado que se publica cuando termina de cargar.
+  const [mapInstance, setMapInstance] = useState<MapLibreMap | null>(null);
   const [collection, setCollection] = useState<VesselFeatureCollection>(EMPTY_VESSEL_COLLECTION);
   const [status, setStatus] = useState<Status>("loading");
   const [count, setCount] = useState(0);
@@ -319,6 +325,7 @@ export function VesselMap() {
       });
 
       setIsMapReady(true);
+      setMapInstance(map);
     });
 
     mapReference.current = map;
@@ -326,6 +333,7 @@ export function VesselMap() {
 
     return () => {
       setIsMapReady(false);
+      setMapInstance(null);
       mapReference.current = null;
       popupReference.current = null;
       selectedMmsiReference.current = null;
@@ -550,6 +558,7 @@ export function VesselMap() {
         onReset={resetFilters}
         isFiltered={isFiltered}
       />
+      <AnalysisLayers map={mapInstance} isMapReady={isMapReady} />
       <VesselMapStatus
         status={status}
         count={visibleCount}
