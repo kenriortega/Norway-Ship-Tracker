@@ -155,3 +155,34 @@ export interface EncountersResponse {
   windowHours: number;
   generatedAt: string;
 }
+
+/**
+ * Un barco que reportó estando en marcha y después se calló. La antigüedad se
+ * mide sobre el reloj del propio barco (`source_timestamp`) y no sobre cuándo
+ * lo recibimos: el proveedor reenvía la última posición conocida en cada
+ * snapshot, así que nuestro reloj diría que sigue vivo cuando no lo está.
+ */
+export interface DarkVesselDto {
+  mmsi: number;
+  name: string | null;
+  latitude: number;
+  longitude: number;
+  darkMinutes: number;
+  lastSpeedOverGround: number | null;
+  lastCourseOverGround: number | null;
+  /** Cómo llegó la última posición: terrestre, satélite u offshore. */
+  source: string | null;
+  observedAt: string | null;
+}
+
+export interface DarkVesselsResponse {
+  vessels: DarkVesselDto[];
+  count: number;
+  /**
+   * Falso cuando nuestra propia ingestión está parada. Sin esto, una caída
+   * nuestra haría pasar por apagones de AIS lo que solo es silencio propio.
+   */
+  fleetHealthy: boolean;
+  thresholdMinutes: number;
+  generatedAt: string;
+}

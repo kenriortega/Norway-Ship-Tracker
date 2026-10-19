@@ -1,6 +1,7 @@
 import type {
   ActivitySample,
   CoverageCounts,
+  DarkVesselsResponse,
   EncountersResponse,
   FreshnessBuckets,
   PortClustersResponse,
@@ -534,4 +535,99 @@ export async function getEncounters(
   }));
 
   return { encounters, count: encounters.length, windowHours: options.windowHours };
+}
+
+interface DarkVesselQueryRow {
+  mmsi: string | number;
+  name: string | null;
+  latitude: string | number;
+  longitude: string | number;
+  dark_minutes: string | number;
+  speed_over_ground: number | null;
+  course_over_ground: number | null;
+  source: string | null;
+  source_timestamp: Date | string | null;
+}
+
+interface FleetHealthQueryRow {
+  recent_positions: string | number;
+  expected_positions: string | number | null;
+}
+
+export interface DarkVesselOptions {
+  /** Silencio a partir del cual un barco en marcha cuenta como oscuro. */
+  thresholdMinutes: number;
+  /** Velocidad mínima en el último reporte; por debajo estaba parado y callar es normal. */
+  minSpeed: number;
+}
+
+/**
+ * Lista los barcos que reportaron navegando y después dejaron de emitir.
+ *
+ * La antigüedad se mide sobre `source_timestamp`, el reloj del barco, nunca
+ * sobre `received_at`. El proveedor reenvía la última posición conocida en
+ * cada snapshot, de modo que nuestro reloj sigue avanzando para un barco que
+ * lleva horas mudo y el apagón quedaría invisible.
+ *
+ * `fleetHealthy` compara el caudal de los últimos cinco minutos con el ritmo
+ * normal de la ventana. Si nuestra ingestión está parada, media flota parece
+ * oscura de golpe y lo honesto es decir que no lo sabemos.
+ */
+export async function getDarkVessels(
+  connection: DatabaseConnection,
+  options: DarkVesselOptions,
+): Promise<Omit<DarkVesselsResponse, "generatedAt">> {
+  const [darkResult, healthResult] = await Promise.all([
+    connection.db.execute(sql`
+      SELECT
+        latest.mmsi,
+        vessel.name,
+        ST_Y(latest.location::geometry) AS latitude,
+        ST_X(latest.location::geometry) AS longitude,
+        extract(epoch FROM (now() - latest.source_timestamp)) / 60 AS dark_minutes,
+        latest.speed_over_ground,
+        latest.course_over_ground,
+        latest.raw_payload->>'stream' AS source,
+        latest.source_timestamp
+      FROM vessel_latest_positions AS latest
+      JOIN vessels AS vessel USING (mmsi)
+      WHERE latest.speed_over_ground > ${options.minSpeed}
+        AND latest.source_timestamp < now() - make_interval(mins => ${options.thresholdMinutes})
+      ORDER BY dark_minutes DESC
+    `),
+    connection.db.execute(sql`
+      SELECT
+        count(*) FILTER (WHERE received_at > now() - interval '5 minutes') AS recent_positions,
+        count(*) / greatest(extract(epoch FROM (max(received_at) - min(received_at))) / 300, 1)
+          AS expected_positions
+      FROM vessel_positions
+      WHERE received_at > now() - interval '6 hours'
+    `),
+  ]);
+
+  const rows = darkResult as unknown as DarkVesselQueryRow[];
+  const [health] = healthResult as unknown as FleetHealthQueryRow[];
+
+  const recent = toNumber(health?.recent_positions ?? 0);
+  const expected = toNumber(health?.expected_positions ?? 0);
+  const fleetHealthy = expected === 0 ? false : recent >= expected * 0.3;
+
+  const vesselsFound = rows.map((row) => ({
+    mmsi: toNumber(row.mmsi),
+    name: row.name,
+    latitude: toNumber(row.latitude),
+    longitude: toNumber(row.longitude),
+    darkMinutes: Math.round(toNumber(row.dark_minutes)),
+    lastSpeedOverGround: row.speed_over_ground,
+    lastCourseOverGround: row.course_over_ground,
+    source: row.source,
+    observedAt: row.source_timestamp ? toIsoString(row.source_timestamp) : null,
+  }));
+
+  return {
+    vessels: vesselsFound,
+    count: vesselsFound.length,
+    fleetHealthy,
+    thresholdMinutes: options.thresholdMinutes,
+  };
 }
