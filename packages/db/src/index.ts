@@ -1,6 +1,7 @@
 import type {
   ActivitySample,
   CoverageCounts,
+  EncountersResponse,
   FreshnessBuckets,
   PortClustersResponse,
   TrafficCell,
@@ -415,4 +416,122 @@ export async function getPortClusters(
   }));
 
   return { ports, count: ports.length, windowHours: options.windowHours };
+}
+
+interface EncounterQueryRow {
+  mmsi_a: string | number;
+  name_a: string | null;
+  mmsi_b: string | number;
+  name_b: string | null;
+  latitude: string | number;
+  longitude: string | number;
+  meters: string | number;
+  still_minutes: string | number;
+}
+
+export interface EncounterOptions {
+  /** Separación máxima entre los dos cascos, en metros. */
+  maxMeters: number;
+  /** Ventana hacia atrás para exigir que ambos llegasen navegando. */
+  windowHours: number;
+  /** Duración mínima del encuentro; por debajo es un cruce, no una cita. */
+  minMinutes: number;
+}
+
+/**
+ * Encuentra parejas de barcos detenidas juntas lejos de puerto.
+ *
+ * Dos filtros hacen todo el trabajo de separar la señal del ruido. El primero
+ * descarta lo que caiga dentro de un fondeadero conocido, porque en un muelle
+ * los barcos hermanos aparecen pegados sin que signifique nada. El segundo
+ * exige que ambos hayan estado navegando en la ventana: un barco amarrado
+ * desde siempre no se ha encontrado con nadie, simplemente vive ahí.
+ *
+ * El `JOIN` va contra la tabla base y no contra un CTE a propósito: un CTE se
+ * materializa y pierde el índice GiST, lo que llevaba la consulta de 0,2 s a
+ * más de un minuto.
+ */
+export async function getEncounters(
+  connection: DatabaseConnection,
+  options: EncounterOptions,
+): Promise<Omit<EncountersResponse, "generatedAt">> {
+  const result = await connection.db.execute(sql`
+    WITH pairs AS (
+      SELECT
+        a.mmsi AS mmsi_a,
+        b.mmsi AS mmsi_b,
+        ST_Distance(a.location, b.location) AS meters,
+        ST_Y(a.location::geometry) AS latitude,
+        ST_X(a.location::geometry) AS longitude,
+        ST_Transform(a.location::geometry, 25833) AS geom
+      FROM vessel_latest_positions AS a
+      JOIN vessel_latest_positions AS b
+        ON b.mmsi > a.mmsi
+       AND ST_DWithin(a.location, b.location, ${options.maxMeters})
+      WHERE coalesce(a.speed_over_ground, 0) < 1
+        AND a.navigational_status IS DISTINCT FROM 5
+        AND coalesce(b.speed_over_ground, 0) < 1
+        AND b.navigational_status IS DISTINCT FROM 5
+    ),
+    moored AS (
+      SELECT ST_Transform(location::geometry, 25833) AS geom
+      FROM vessel_latest_positions
+      WHERE navigational_status = 5
+    ),
+    clustered AS (
+      SELECT geom, ST_ClusterDBSCAN(geom, eps := 1500, minpoints := 4) OVER () AS cluster_id
+      FROM moored
+    ),
+    harbours AS (
+      SELECT
+        ST_Centroid(ST_Collect(geom)) AS centre,
+        ST_MaxDistance(ST_Collect(geom), ST_Centroid(ST_Collect(geom))) AS radius
+      FROM clustered
+      WHERE cluster_id IS NOT NULL
+      GROUP BY cluster_id
+    ),
+    under_way AS (
+      SELECT mmsi, max(received_at) AS last_moving
+      FROM vessel_positions
+      WHERE received_at > now() - make_interval(hours => ${options.windowHours})
+        AND speed_over_ground > 3
+      GROUP BY mmsi
+    )
+    SELECT
+      pairs.mmsi_a,
+      vessel_a.name AS name_a,
+      pairs.mmsi_b,
+      vessel_b.name AS name_b,
+      pairs.latitude,
+      pairs.longitude,
+      pairs.meters,
+      extract(epoch FROM (now() - greatest(moving_a.last_moving, moving_b.last_moving))) / 60
+        AS still_minutes
+    FROM pairs
+    JOIN under_way AS moving_a ON moving_a.mmsi = pairs.mmsi_a
+    JOIN under_way AS moving_b ON moving_b.mmsi = pairs.mmsi_b
+    JOIN vessels AS vessel_a ON vessel_a.mmsi = pairs.mmsi_a
+    JOIN vessels AS vessel_b ON vessel_b.mmsi = pairs.mmsi_b
+    WHERE NOT EXISTS (
+      SELECT 1 FROM harbours
+      WHERE ST_DWithin(pairs.geom, harbours.centre, harbours.radius + 1000)
+    )
+      AND now() - greatest(moving_a.last_moving, moving_b.last_moving)
+          > make_interval(mins => ${options.minMinutes})
+    ORDER BY still_minutes DESC
+  `);
+
+  const rows = result as unknown as EncounterQueryRow[];
+  const encounters = rows.map((row) => ({
+    mmsiA: toNumber(row.mmsi_a),
+    nameA: row.name_a,
+    mmsiB: toNumber(row.mmsi_b),
+    nameB: row.name_b,
+    latitude: toNumber(row.latitude),
+    longitude: toNumber(row.longitude),
+    meters: Math.round(toNumber(row.meters)),
+    stillMinutes: Math.round(toNumber(row.still_minutes)),
+  }));
+
+  return { encounters, count: encounters.length, windowHours: options.windowHours };
 }

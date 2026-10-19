@@ -131,3 +131,27 @@ export interface PortClustersResponse {
   windowHours: number;
   generatedAt: string;
 }
+
+/**
+ * Dos barcos quietos y pegados fuera de cualquier fondeadero. Ambos llegaron
+ * navegando, así que no es un atraque permanente sino un encuentro: en aguas
+ * noruegas suele ser servicio a piscifactorías, repostaje o trasbordo.
+ */
+export interface EncounterDto {
+  mmsiA: number;
+  nameA: string | null;
+  mmsiB: number;
+  nameB: string | null;
+  latitude: number;
+  longitude: number;
+  meters: number;
+  /** Minutos desde que el último de los dos dejó de navegar. */
+  stillMinutes: number;
+}
+
+export interface EncountersResponse {
+  encounters: EncounterDto[];
+  count: number;
+  windowHours: number;
+  generatedAt: string;
+}
