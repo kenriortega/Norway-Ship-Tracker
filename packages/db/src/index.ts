@@ -129,18 +129,21 @@ export async function persistVesselUpdate(
          OR vessel_latest_positions.source_timestamp <= EXCLUDED.source_timestamp
     `);
 
+    // El histórico no guarda `raw_payload`: nadie lo lee de aquí y pesaba casi
+    // la mitad de cada fila. El payload crudo sigue disponible en
+    // `vessel_latest_positions` para la posición vigente de cada barco.
     await tx.execute(sql`
       INSERT INTO vessel_positions (
         mmsi, received_at, source_timestamp, location, speed_over_ground,
         course_over_ground, true_heading, rate_of_turn, navigational_status,
-        source_message_type, provider, raw_payload, persisted_at
+        source_message_type, provider, persisted_at
       )
       SELECT
         ${update.mmsi}, ${receivedAt}, ${observedAt},
         ST_SetSRID(ST_MakePoint(${update.longitude}, ${update.latitude}), 4326)::geography,
         ${update.speedOverGround}, ${update.courseOverGround}, ${update.trueHeading},
         ${update.rateOfTurn}, ${update.navigationalStatus}, NULL,
-        ${update.provider}, ${JSON.stringify(update.rawPayload)}::jsonb, now()
+        ${update.provider}, now()
       WHERE NOT EXISTS (
         SELECT 1
         FROM vessel_positions
@@ -630,4 +633,53 @@ export async function getDarkVessels(
     fleetHealthy,
     thresholdMinutes: options.thresholdMinutes,
   };
+}
+
+export interface RetentionOptions {
+  /** Días completos de histórico a conservar además del día en curso. */
+  retentionDays: number;
+  /** Días de particiones a aprovisionar por delante del día en curso. */
+  aheadDays: number;
+}
+
+export interface RetentionResult {
+  created: string[];
+  dropped: string[];
+}
+
+interface RetentionQueryRow {
+  created: string[] | null;
+  dropped: string[] | null;
+}
+
+/**
+ * Aplica la política de retención del histórico: crea las particiones diarias
+ * que faltan y retira las que caducaron.
+ *
+ * El trabajo real lo hace `maintain_vessel_positions_partitions`, creada por
+ * la migración 0003. Tener el DDL en SQL y no aquí mantiene el "qué" versionado
+ * junto al esquema; esta función solo decide el "cuándo".
+ *
+ * Retirar un día caducado es un `DROP TABLE` instantáneo. La alternativa, un
+ * `DELETE` de los casi tres millones de filas que entran cada día, dejaría
+ * otras tantas tuplas muertas que recorrer mientras siguen llegando treinta
+ * inserciones por segundo, y no devolvería el disco sin bloquear la tabla.
+ */
+export async function applyHistoryRetention(
+  connection: DatabaseConnection,
+  options: RetentionOptions,
+): Promise<RetentionResult> {
+  // Los casts no son decorativos: la conexión va sin `prepare`, así que los
+  // parámetros llegan como `unknown` y Postgres no sabría qué sobrecarga de la
+  // función elegir.
+  const result = await connection.db.execute(sql`
+    SELECT created, dropped
+    FROM maintain_vessel_positions_partitions(
+      ${options.retentionDays}::integer,
+      ${options.aheadDays}::integer
+    )
+  `);
+
+  const [row] = result as unknown as RetentionQueryRow[];
+  return { created: row?.created ?? [], dropped: row?.dropped ?? [] };
 }

@@ -12,6 +12,7 @@ import {
 } from "./barentswatch/client.js";
 import { loadConfig } from "./config.js";
 import { initialHealth, startHealthServer } from "./health.js";
+import { startDatabaseHistoryMaintenance } from "./maintenance.js";
 
 const config = loadConfig();
 const database = createDatabase(config.databaseUrl, 5);
@@ -76,6 +77,43 @@ const callbacks: StreamCallbacks = {
   },
 };
 
+// Crea las particiones diarias que faltan y retira las caducadas. Arranca
+// antes que el stream para que nunca falte la partición del día en curso donde
+// aterrizarán las primeras posiciones.
+const maintenance = startDatabaseHistoryMaintenance({
+  database,
+  retentionDays: config.historyRetentionDays,
+  aheadDays: config.partitionAheadDays,
+  intervalMinutes: config.maintenanceIntervalMinutes,
+  callbacks: {
+    onResult(result) {
+      health.lastMaintenanceAt = new Date().toISOString();
+      health.lastMaintenanceError = null;
+      health.partitionsCreated += result.created.length;
+      health.partitionsDropped += result.dropped.length;
+
+      if (result.created.length > 0 || result.dropped.length > 0) {
+        console.info(
+          JSON.stringify({
+            event: "history_retention_applied",
+            created: result.created,
+            dropped: result.dropped,
+          }),
+        );
+      }
+    },
+    onError(error) {
+      health.lastMaintenanceError = describeError(error);
+      console.error(
+        JSON.stringify({
+          event: "history_retention_failed",
+          error: health.lastMaintenanceError,
+        }),
+      );
+    },
+  },
+});
+
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => shutdown.abort());
 }
@@ -108,5 +146,8 @@ try {
 } finally {
   health.streamConnected = false;
   healthServer.close();
+  // Antes de cerrar la conexión: una pasada a medias moriría con un error de
+  // conexión cerrada que no significa nada.
+  await maintenance.stop();
   await closeDatabase(database);
 }

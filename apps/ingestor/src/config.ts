@@ -8,6 +8,9 @@ export interface IngestorConfig {
   latestUrl: string;
   bootstrapSnapshot: boolean;
   historySampleSeconds: number;
+  historyRetentionDays: number;
+  partitionAheadDays: number;
+  maintenanceIntervalMinutes: number;
   initialBackoffMs: number;
   maxBackoffMs: number;
   healthPort: number;
@@ -49,6 +52,14 @@ export function loadConfig(): IngestorConfig {
       "https://live.ais.barentswatch.no/v1/latest/combined",
     bootstrapSnapshot: process.env.AIS_BOOTSTRAP_SNAPSHOT !== "false",
     historySampleSeconds: positiveInteger("AIS_HISTORY_SAMPLE_SECONDS", 60),
+    // Tres días completos más el día en curso: garantiza al menos 72 h de
+    // histórico a cualquier hora, que es el tope que aceptan /api/ports y
+    // /api/encounters.
+    historyRetentionDays: positiveInteger("AIS_HISTORY_RETENTION_DAYS", 3),
+    // Dos días por delante y no solo el siguiente: una parada larga del worker
+    // no deja al sistema sin partición donde insertar al cambiar la fecha.
+    partitionAheadDays: positiveInteger("AIS_PARTITION_AHEAD_DAYS", 2),
+    maintenanceIntervalMinutes: positiveInteger("AIS_MAINTENANCE_INTERVAL_MINUTES", 30),
     initialBackoffMs: positiveInteger("AIS_INITIAL_BACKOFF_MS", 1_000),
     maxBackoffMs: positiveInteger("AIS_MAX_BACKOFF_MS", 30_000),
     healthPort: positiveInteger("HEALTH_PORT", 3_001),

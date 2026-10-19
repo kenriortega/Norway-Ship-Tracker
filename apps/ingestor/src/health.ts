@@ -12,6 +12,10 @@ export interface IngestorHealth {
   persistenceFailures: number;
   reconnects: number;
   lastError: string | null;
+  lastMaintenanceAt: string | null;
+  lastMaintenanceError: string | null;
+  partitionsCreated: number;
+  partitionsDropped: number;
 }
 
 export function initialHealth(): IngestorHealth {
@@ -27,6 +31,10 @@ export function initialHealth(): IngestorHealth {
     persistenceFailures: 0,
     reconnects: 0,
     lastError: null,
+    lastMaintenanceAt: null,
+    lastMaintenanceError: null,
+    partitionsCreated: 0,
+    partitionsDropped: 0,
   };
 }
 

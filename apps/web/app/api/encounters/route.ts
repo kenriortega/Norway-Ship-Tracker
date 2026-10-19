@@ -9,6 +9,10 @@ export const runtime = "nodejs";
 
 const DEFAULT_MAX_METERS = 400;
 const DEFAULT_WINDOW_HOURS = 24;
+// El histórico se purga a los tres días completos más el día en curso, así que
+// garantiza 72 h a cualquier hora. Pedir más devolvería una respuesta
+// incompleta sin avisar, que es peor que un parámetro acotado.
+const MAX_WINDOW_HOURS = 72;
 const DEFAULT_MIN_MINUTES = 30;
 
 function boundedParameter(
@@ -31,7 +35,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const parameters = request.nextUrl.searchParams;
     const found = await getEncounters(getDatabase(), {
       maxMeters: boundedParameter(parameters, "meters", DEFAULT_MAX_METERS, 10, 5_000),
-      windowHours: boundedParameter(parameters, "windowHours", DEFAULT_WINDOW_HOURS, 1, 168),
+      windowHours: boundedParameter(parameters, "windowHours", DEFAULT_WINDOW_HOURS, 1, MAX_WINDOW_HOURS),
       minMinutes: boundedParameter(parameters, "minMinutes", DEFAULT_MIN_MINUTES, 0, 1_440),
     });
 

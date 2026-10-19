@@ -72,6 +72,17 @@ export const vesselLatestPositions = pgTable(
   ],
 );
 
+/**
+ * Histórico de posiciones. En la base es una tabla particionada por rango
+ * diario sobre `received_at`, algo que Drizzle no sabe expresar: aquí se
+ * describe la tabla padre, que es contra la que se consulta y se inserta. Las
+ * particiones y la retención las lleva `maintain_vessel_positions_partitions`,
+ * creada en la migración 0003 y llamada por el worker.
+ *
+ * No guarda `raw_payload`: ningún endpoint lo lee del histórico y pesaba casi
+ * la mitad de cada fila. La copia que sí se consulta vive en
+ * `vessel_latest_positions`.
+ */
 export const vesselPositions = pgTable(
   "vessel_positions",
   {
@@ -88,17 +99,14 @@ export const vesselPositions = pgTable(
     rateOfTurn: real("rate_of_turn"),
     navigationalStatus: smallint("navigational_status"),
     sourceMessageType: smallint("source_message_type"),
-    radioChannel: char("radio_channel", { length: 1 }),
     messageHash: bytea("message_hash"),
     provider: text("provider").notNull().default("barentswatch"),
-    rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>(),
     persistedAt: timestamp("persisted_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
   (table) => [
+    // La columna de particionado tiene que formar parte de la clave primaria.
     primaryKey({ columns: [table.mmsi, table.receivedAt] }),
-    index("vessel_positions_location_gix").using("gist", table.location),
     index("vessel_positions_received_at_idx").on(table.receivedAt),
-    index("vessel_positions_mmsi_received_at_idx").on(table.mmsi, table.receivedAt),
   ],
 );
 
