@@ -107,3 +107,27 @@ export interface VesselStatsResponse {
   coverage: CoverageCounts;
   generatedAt: string;
 }
+
+/**
+ * Un fondeadero o terminal que el propio tráfico dibuja: no viene de ningún
+ * catálogo externo, sale de agrupar los barcos amarrados que comparten sitio.
+ * Por eso no tiene nombre, solo centro, radio y lo que ocurre dentro.
+ */
+export interface PortClusterDto {
+  id: number;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  mooredVessels: number;
+  /** Amarrados que en la ventana consultada venían navegando: escalas recientes. */
+  recentArrivals: number;
+  /** Tipos de barco presentes, en códigos AIS crudos y ordenados por frecuencia. */
+  shipTypes: number[];
+}
+
+export interface PortClustersResponse {
+  ports: PortClusterDto[];
+  count: number;
+  windowHours: number;
+  generatedAt: string;
+}

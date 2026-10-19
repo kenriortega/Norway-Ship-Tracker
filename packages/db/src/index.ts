@@ -2,6 +2,7 @@ import type {
   ActivitySample,
   CoverageCounts,
   FreshnessBuckets,
+  PortClustersResponse,
   TrafficCell,
   VesselBreakdownRow,
   VesselPositionDto,
@@ -334,4 +335,84 @@ export async function getVesselStats(
   const movingVessels = breakdown.reduce((sum, row) => sum + row.moving, 0);
 
   return { totalVessels, movingVessels, breakdown, activity, traffic, freshness, coverage };
+}
+
+interface PortClusterQueryRow {
+  cluster_id: string | number;
+  latitude: string | number;
+  longitude: string | number;
+  radius_meters: string | number | null;
+  moored_vessels: string | number;
+  recent_arrivals: string | number;
+  ship_types: (number | null)[] | null;
+}
+
+export interface PortClusterOptions {
+  /** Distancia máxima entre barcos del mismo fondeadero, en metros. */
+  epsMeters: number;
+  /** Barcos mínimos para considerar que hay fondeadero y no un atraque suelto. */
+  minVessels: number;
+  /** Ventana hacia atrás para contar escalas recientes. */
+  windowHours: number;
+}
+
+/**
+ * Descubre fondeaderos agrupando los barcos amarrados por cercanía. El
+ * clustering trabaja sobre ETRS89 / UTM 33N y no sobre grados: en Noruega un
+ * grado de longitud vale un tercio que uno de latitud, así que agrupar en
+ * grados deformaría los fondeaderos del norte hasta partirlos.
+ */
+export async function getPortClusters(
+  connection: DatabaseConnection,
+  options: PortClusterOptions,
+): Promise<Omit<PortClustersResponse, "generatedAt">> {
+  const result = await connection.db.execute(sql`
+    WITH moored AS (
+      SELECT latest.mmsi, vessel.ship_type,
+             ST_Transform(latest.location::geometry, 25833) AS geom
+      FROM vessel_latest_positions AS latest
+      JOIN vessels AS vessel USING (mmsi)
+      WHERE latest.navigational_status = 5
+    ),
+    clustered AS (
+      SELECT mmsi, ship_type, geom,
+             ST_ClusterDBSCAN(geom, eps := ${options.epsMeters}, minpoints := ${options.minVessels})
+               OVER () AS cluster_id
+      FROM moored
+    ),
+    -- Un amarrado que en la ventana estuvo navegando es un barco que acaba de
+    -- llegar; el que nunca se movió llevaba ahí desde antes y no es una escala.
+    arrived AS (
+      SELECT DISTINCT mmsi
+      FROM vessel_positions
+      WHERE received_at > now() - make_interval(hours => ${options.windowHours})
+        AND speed_over_ground > 3
+    )
+    SELECT
+      clustered.cluster_id,
+      count(*) AS moored_vessels,
+      count(*) FILTER (WHERE arrived.mmsi IS NOT NULL) AS recent_arrivals,
+      ST_Y(ST_Transform(ST_Centroid(ST_Collect(clustered.geom)), 4326)) AS latitude,
+      ST_X(ST_Transform(ST_Centroid(ST_Collect(clustered.geom)), 4326)) AS longitude,
+      ST_MaxDistance(ST_Collect(clustered.geom), ST_Centroid(ST_Collect(clustered.geom))) AS radius_meters,
+      array_agg(DISTINCT clustered.ship_type) FILTER (WHERE clustered.ship_type IS NOT NULL) AS ship_types
+    FROM clustered
+    LEFT JOIN arrived USING (mmsi)
+    WHERE clustered.cluster_id IS NOT NULL
+    GROUP BY clustered.cluster_id
+    ORDER BY moored_vessels DESC
+  `);
+
+  const rows = result as unknown as PortClusterQueryRow[];
+  const ports = rows.map((row) => ({
+    id: toNumber(row.cluster_id),
+    latitude: toNumber(row.latitude),
+    longitude: toNumber(row.longitude),
+    radiusMeters: Math.round(toNumber(row.radius_meters ?? 0)),
+    mooredVessels: toNumber(row.moored_vessels),
+    recentArrivals: toNumber(row.recent_arrivals),
+    shipTypes: (row.ship_types ?? []).filter((type): type is number => type !== null),
+  }));
+
+  return { ports, count: ports.length, windowHours: options.windowHours };
 }
