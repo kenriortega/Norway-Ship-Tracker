@@ -1,25 +1,8 @@
-export const AIS_PROVIDER = "barentswatch" as const;
-
-export interface VesselUpdate {
-  provider: typeof AIS_PROVIDER;
-  mmsi: number;
-  observedAt: Date;
-  receivedAt: Date;
-  latitude: number;
-  longitude: number;
-  name: string | null;
-  imoNumber: number | null;
-  callSign: string | null;
-  shipType: number | null;
-  speedOverGround: number | null;
-  courseOverGround: number | null;
-  trueHeading: number | null;
-  rateOfTurn: number | null;
-  navigationalStatus: number | null;
-  destination: string | null;
-  draughtMeters: number | null;
-  rawPayload: Record<string, unknown>;
-}
+// Modelos que cruzan la frontera entre las consultas y la interfaz.
+//
+// El modelo de escritura (la posición normalizada que entra desde el
+// proveedor) ya no vive aquí: es `internal/domain` del worker en Go. Este
+// paquete son los DTO que sirve la API y consume la web.
 
 export interface VesselPositionDto {
   mmsi: number;

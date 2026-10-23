@@ -31,14 +31,20 @@ compatible con entornos serverless.
 
 ### Worker persistente
 
-`apps/ingestor` obtiene y renueva el token OAuth, descarga opcionalmente el
+`apps/ingestor-go` obtiene y renueva el token OAuth, descarga opcionalmente el
 snapshot inicial, mantiene el stream, reconecta con backoff y persiste mensajes.
 Expone `GET /health` en un puerto separado.
 
+Es un módulo Go independiente, no un workspace de npm. Comparte con la web el
+esquema de la base y nada más: el camino de escritura vive en Go y el de
+lectura en `packages/db`.
+
 ### Paquetes compartidos
 
-- `packages/domain`: modelos independientes del transporte.
-- `packages/db`: esquema Drizzle, escritura PostGIS y consultas geográficas.
+- `packages/domain`: modelos independientes del transporte, que consume la web.
+- `packages/db`: consultas geográficas para la web y el runner de migraciones.
+  El esquema no se describe en código: la fuente de verdad son las migraciones
+  SQL de `migrations/`, escritas a mano.
 
 ## Persistencia
 

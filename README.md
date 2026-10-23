@@ -7,10 +7,10 @@ distribuido en tiempo real por BarentsWatch.
 
 - `apps/web`: Next.js, shadcn/ui, MapLibre y endpoints de consulta. Se despliega
   en Vercel.
-- `apps/ingestor`: worker TypeScript persistente que consume el stream AIS y
-  escribe en PostgreSQL/PostGIS.
+- `apps/ingestor-go`: worker Go persistente que consume el stream AIS y escribe
+  en PostgreSQL/PostGIS. Ver [ADR 0004](docs/decisions/0004-ingestor-en-go.md).
 - `packages/domain`: tipos normalizados compartidos.
-- `packages/db`: esquema Drizzle, escritura y consultas PostGIS.
+- `packages/db`: consultas PostGIS para la web y el runner de migraciones.
 - `migrations`: migraciones SQL aplicadas en orden.
 - `fixtures/barentswatch`: mensajes NDJSON pequeños para pruebas sin red.
 - `apps/backend`, `tools/capture` y `tools/replay`: implementación Rust/NMEA
@@ -18,7 +18,7 @@ distribuido en tiempo real por BarentsWatch.
 
 ## Desarrollo local
 
-Requiere Node.js 20 o superior, Docker y npm.
+Requiere Node.js 20 o superior, Go 1.25 o superior, Docker y npm.
 
 1. Copia `.env.example` como `.env` y completa las credenciales de BarentsWatch.
 2. Instala las dependencias desde la raíz:
@@ -47,6 +47,9 @@ Requiere Node.js 20 o superior, Docker y npm.
    npm run dev:ingestor
    ```
 
+   El atajo entra en `apps/ingestor-go` y ejecuta `go run ./cmd/ingestor`; el
+   worker no es un workspace de npm, pero el comando se conserva.
+
 6. Inicia Next.js en otra terminal:
 
    ```sh
@@ -68,22 +71,53 @@ La interfaz estará en `http://localhost:3000`, las posiciones en
 
 ## Validaciones
 
+La web y los paquetes compartidos:
+
 ```sh
 npm run typecheck
-npm test
 npm run lint
 npm run build
 ```
 
-Las pruebas del parser y del normalizador utilizan fixtures locales y no dependen
-de BarentsWatch.
+El worker, que es donde viven las pruebas del parser, el normalizador y el
+camino de escritura:
+
+```sh
+cd apps/ingestor-go && go test ./...
+```
+
+Ninguna depende de una conexión con BarentsWatch: el parser y el normalizador
+usan los fixtures de `fixtures/barentswatch`, el transporte usa servidores HTTP
+de prueba y las de integración se saltan sin `SHIPS_TEST_DATABASE_URL`.
+
+## El worker
+
+`apps/ingestor-go` mantiene el stream AIS y lo persiste. Es un módulo Go propio,
+fuera de los workspaces de npm:
+
+```sh
+cd apps/ingestor-go
+go test ./...
+go run ./cmd/ingestor
+```
+
+Lee el `.env` de la raíz a través del entorno y expone `/health` en su propio
+puerto. En marcha ocupa unos 13 MB de RSS y su imagen son 10,5 MB.
+
+Las pruebas de integración necesitan PostgreSQL con PostGIS y el esquema ya
+migrado. Sin `SHIPS_TEST_DATABASE_URL` se saltan:
+
+```sh
+SHIPS_TEST_DATABASE_URL=postgres://... go test ./...
+```
 
 ## Despliegue
 
 La raíz contiene `vercel.json` para construir `apps/web`. En Vercel debe
 configurarse un `DATABASE_URL` con pooling.
 
-El worker se despliega aparte mediante `apps/ingestor/Dockerfile` y necesita:
+El worker se despliega aparte mediante `apps/ingestor-go/Dockerfile`, cuyo
+contexto de build es ese directorio, y necesita:
 
 - `DATABASE_URL`
 - `BARENTSWATCH_CLIENT_ID`
