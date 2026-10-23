@@ -1,0 +1,5 @@
+# El contexto es este directorio, así que la lista es corta: lo único que
+# sobra son los binarios locales y los ficheros de entorno.
+.env
+*.log
+ingestor
