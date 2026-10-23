@@ -76,6 +76,12 @@ CREATE INDEX vessel_positions_received_at_idx
  * partición donde insertar en cuanto cambie la fecha.
  *
  * Es idempotente y se puede llamar tan a menudo como se quiera.
+ *
+ * Nada va cualificado con un esquema. Esta migración se aplica tanto sobre una
+ * base donde las tablas viven en `public` como sobre el montaje de
+ * `infra-common`, que le da a cada proyecto el suyo y lo resuelve con el
+ * `search_path` del rol. Fijar `public` aquí ataba la retención a una de las
+ * dos formas y rompía la otra.
  */
 CREATE OR REPLACE FUNCTION maintain_vessel_positions_partitions(
     retention_days INTEGER,
@@ -110,7 +116,7 @@ BEGIN
     LOOP
         partition_name := 'vessel_positions_' || to_char(day, 'YYYYMMDD');
 
-        IF to_regclass(format('public.%I', partition_name)) IS NULL THEN
+        IF to_regclass(format('%I', partition_name)) IS NULL THEN
             EXECUTE format(
                 'CREATE TABLE %I PARTITION OF vessel_positions FOR VALUES FROM (%L) TO (%L)',
                 partition_name,
@@ -128,7 +134,7 @@ BEGIN
         SELECT child.relname
         FROM pg_inherits
         JOIN pg_class AS child ON child.oid = pg_inherits.inhrelid
-        WHERE pg_inherits.inhparent = 'public.vessel_positions'::REGCLASS
+        WHERE pg_inherits.inhparent = 'vessel_positions'::REGCLASS
           AND child.relname ~ '^vessel_positions_\d{8}$'
     LOOP
         partition_day := to_date(right(partition_name, 8), 'YYYYMMDD');
@@ -144,6 +150,20 @@ BEGIN
     RETURN QUERY SELECT created_names, dropped_names;
 END;
 $function$;
+
+-- El `search_path` de la función queda clavado al esquema donde se instala.
+-- Sin esto, la función resolvería `vessel_positions` con el `search_path` de
+-- quien la llame: el worker y una sesión de psql con otro `search_path`
+-- operarían sobre tablas distintas, y ese es el tipo de fallo que solo
+-- aparece el día que alguien la ejecuta a mano.
+DO $pin$
+BEGIN
+    EXECUTE format(
+        'ALTER FUNCTION maintain_vessel_positions_partitions(INTEGER, INTEGER) SET search_path = %I, public',
+        current_schema()
+    );
+END
+$pin$;
 
 -- Particiones que cubren lo que ya había guardado, para que la copia tenga
 -- dónde caer aunque el histórico actual sea más ancho que la retención.
@@ -167,7 +187,7 @@ BEGIN
     LOOP
         partition_name := 'vessel_positions_' || to_char(day, 'YYYYMMDD');
 
-        IF to_regclass(format('public.%I', partition_name)) IS NULL THEN
+        IF to_regclass(format('%I', partition_name)) IS NULL THEN
             EXECUTE format(
                 'CREATE TABLE %I PARTITION OF vessel_positions FOR VALUES FROM (%L) TO (%L)',
                 partition_name,
