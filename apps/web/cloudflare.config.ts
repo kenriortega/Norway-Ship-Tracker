@@ -6,9 +6,6 @@ export default defineConfig({
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-10-24",
     compatibilityFlags: ["nodejs_compat"],
-    // Dominio propio en lugar de un subdominio de workers.dev. La zona ya
-    // está en Cloudflare, así que el registro DNS lo crea el despliegue.
-    domains: ["ships.kenridev.xyz"],
     assets: {
       htmlHandling: "none",
       notFoundHandling: "none",

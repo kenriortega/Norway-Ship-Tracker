@@ -110,9 +110,22 @@ El binding de Hyperdrive exige un `dev.connectionString`. No es un requisito
 molesto: sin él, `vite dev` apuntaría a la base de producción desde cualquier
 portátil. En local sale de `DATABASE_URL`.
 
+## El dominio no se declara en la configuración
+
+`vinext-cloudflare deploy` genera su propio `worker.config.json` a partir de
+un subconjunto de `cloudflare.config.ts`: propaga `name`, fechas de
+compatibilidad, `assets` y `env` —los bindings llegan íntegros, Hyperdrive
+incluido— pero **descarta `domains`**. Declararlo ahí no hace nada y el
+despliegue sigue pidiendo un subdominio de `workers.dev`.
+
+El orden que funciona es el inverso: registrar el subdominio de `workers.dev`
+una vez, desplegar, y después asociar el dominio propio al Worker desde el
+panel. No se puede añadir un dominio a un Worker que todavía no existe.
+
 ## Lo que queda
 
-1. Desplegar el Worker: `npm run deploy:vinext`.
+1. Registrar el subdominio de `workers.dev` y desplegar.
+2. Asociar `ships.kenridev.xyz` al Worker ya desplegado.
 2. Decidir qué pasa con `vercel.json`, que queda obsoleto.
 3. El túnel `trackers-pg` y su `cloudflared` siguen levantados pero ya no
    hacen falta para la base. Se mantienen por si la web acaba sirviéndose
