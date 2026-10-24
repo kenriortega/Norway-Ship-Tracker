@@ -81,14 +81,42 @@ rutas que consultaban la base pasan ahora por ahí. Verificado con quince
 peticiones seguidas a las cinco rutas: todas 200, con datos, y las trazas del
 runtime en `ok`.
 
+## Cómo se conectó a la base
+
+Hyperdrive ofrece tres formas de alcanzar el origen: público sin restricción,
+público restringido por lista de IPs, o red privada por túnel. **Se eligió la
+segunda**, y no por preferencia técnica: la tercera exige proteger el túnel con
+Cloudflare Access, y Access exige activar Zero Trust, que pide una tarjeta.
+
+Así que Postgres publica su puerto y el filtro se hace por origen:
+
+- En el cortafuegos de DigitalOcean, los 15 rangos IPv4 publicados de
+  Cloudflare, que es por donde sale Hyperdrive.
+- En la cadena `DOCKER-USER` del droplet, los 22 rangos, persistidos con
+  `iptables-persistent`. **Esta capa no es redundante**: Docker inserta sus
+  reglas de iptables antes que las de `ufw`, así que un puerto publicado sería
+  alcanzable pese a lo que diga `ufw`. `DOCKER-USER` es la única cadena que
+  Docker respeta.
+
+Lo que se pierde está dicho: el droplet deja de escuchar solo por el 22. Lo
+que protege de verdad sigue siendo el TLS y una contraseña de 24 bytes
+aleatorios, igual que en Neon o Supabase, con el filtro de origen como capa
+extra. Esos rangos los puede cambiar Cloudflare, y entonces habrá que
+actualizarlos en los dos sitios.
+
+## El binding en local
+
+El binding de Hyperdrive exige un `dev.connectionString`. No es un requisito
+molesto: sin él, `vite dev` apuntaría a la base de producción desde cualquier
+portátil. En local sale de `DATABASE_URL`.
+
 ## Lo que queda
 
-1. Apuntar `withDatabase` al binding de Hyperdrive en vez de a
-   `process.env.DATABASE_URL`. La forma ya es la correcta; cambia la fuente de
-   la cadena de conexión.
-2. TLS en el Postgres de `infra-common`, que Hyperdrive exige y hoy no tiene.
-3. Túnel y configuración de Hyperdrive, con su caché desactivada.
-4. Desplegar, y decidir qué pasa con `vercel.json`.
+1. Desplegar el Worker: `npm run deploy:vinext`.
+2. Decidir qué pasa con `vercel.json`, que queda obsoleto.
+3. El túnel `trackers-pg` y su `cloudflared` siguen levantados pero ya no
+   hacen falta para la base. Se mantienen por si la web acaba sirviéndose
+   desde el droplet; si no, se retiran y son 30 MB menos.
 
 ## Riesgos aceptados
 

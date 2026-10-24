@@ -15,6 +15,14 @@ if (existsSync(rootEnvironmentFile)) {
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@norway-ship-tracker/db", "@norway-ship-tracker/domain"],
+  // `cloudflare:workers` solo existe dentro de workerd. Webpack no sabe qué
+  // hacer con ese esquema y rompe el build de Next, aunque el import sea
+  // dinámico y esté dentro de un try. Declararlo externo deja que falle en
+  // tiempo de ejecución, que es donde el try lo recoge y cae a DATABASE_URL.
+  webpack(config) {
+    config.externals = [...(config.externals ?? []), "cloudflare:workers"];
+    return config;
+  },
 };
 
 export default nextConfig;
