@@ -30,3 +30,13 @@ captures/
 
 # Copia generada del worker de MapLibre (ver apps/web/scripts)
 apps/web/public/maplibre-gl-worker.mjs
+
+# Skills de agente instaladas con `npx skills add`. Son material de terceros
+# que se recupera con el comando y envejece por su cuenta; no se versiona.
+.agents/
+.claude/skills/
+skills-lock.json
+
+# Secretos locales de Cloudflare Workers
+.dev.vars
+.dev.vars.*

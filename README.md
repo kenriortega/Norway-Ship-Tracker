@@ -113,6 +113,33 @@ migrado. Sin `SHIPS_TEST_DATABASE_URL` se saltan:
 SHIPS_TEST_DATABASE_URL=postgres://... go test ./...
 ```
 
+## Cloudflare Workers (en curso)
+
+La web se está moviendo de Vercel a Cloudflare Workers con vinext. El
+andamiaje convive con Next: `npm run dev` y `npm run build` siguen funcionando
+como siempre.
+
+```sh
+cd apps/web
+npm run dev:vinext      # servidor sobre workerd, puerto 3001
+npm run build:vinext
+npm run deploy:vinext
+```
+
+Los secretos van declarados en `cloudflare.config.ts` y sus valores en un
+`.dev.vars` que no se versiona. Ponerlos solo en el entorno del shell no basta:
+el Worker no los ve.
+
+Queda pendiente el camino a la base. Ver
+[ADR 0005](docs/decisions/0005-web-en-cloudflare-workers.md), que incluye por
+qué `lib/database.ts` no funciona tal cual sobre Workers.
+
+Para retomar la migración con la skill de Cloudflare a mano:
+
+```sh
+npx skills add cloudflare/vinext
+```
+
 ## Despliegue
 
 La raíz contiene `vercel.json` para construir `apps/web`. En Vercel debe
