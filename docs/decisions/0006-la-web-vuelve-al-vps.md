@@ -1,6 +1,6 @@
 # ADR 0006: La web vuelve al VPS
 
-**Estado:** en curso.
+**Estado:** aceptada. Aplicada el 24 de octubre de 2026.
 
 ## Contexto
 
@@ -96,3 +96,32 @@ hecho y probado.
 `*:vinext`. No está en uso, pero el ADR 0005 documenta que funcionó y por qué
 se retiró. Borrarlo dejaría la pregunta "¿por qué no está en el borde?" sin
 respuesta en el código.
+
+## Qué quedó hecho
+
+La web corre en el droplet y `ships.kenridev.xyz` sale por el túnel desde el
+24 de octubre de 2026. El Worker sigue desplegado en
+`web.kenriortega-af8.workers.dev` y el código de Workers sigue en el
+repositorio, así que la vuelta atrás existe; lo que ya no existe es
+Hyperdrive, que habría que volver a crear:
+
+| | |
+|---|---|
+| Nombre | `trackers-ships` |
+| Origen | `pg.kenridev.xyz:5432`, base `trackers`, rol `ships_app` |
+| Límite de conexiones | 20 |
+| Caché | desactivada |
+
+De la limpieza quedan dos cabos sueltos, los dos en el panel:
+
+| Pieza | |
+|---|---|
+| Hyperdrive | retirada |
+| El 5432 publicado | retirado; el droplet escucha solo por el 22 |
+| Las reglas de `DOCKER-USER` | retiradas (IPv4 e IPv6), con copia en `/root/iptables-rules.v*.antes-adr0006` |
+| Los rangos de Cloudflare en el cortafuegos de DigitalOcean | **pendiente** |
+| El registro DNS `pg.kenridev.xyz` | **pendiente** |
+
+Las dos pendientes son inofensivas mientras el puerto esté cerrado —no hay
+nada escuchando a lo que dejar entrar—, pero conviene retirarlas para que la
+configuración no describa una topología que ya no existe.
