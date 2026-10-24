@@ -13,6 +13,10 @@ out/
 npm-debug.log*
 pnpm-debug.log*
 
+# Generado, y disputado: vinext y `next build` se lo reescriben el uno al
+# otro en cada pasada. Seguirlo en git solo produce ruido.
+apps/web/next-env.d.ts
+
 # Binario compilado del worker (ver el script dev:ingestor)
 apps/ingestor-go/bin/
 
