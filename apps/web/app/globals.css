@@ -2,17 +2,24 @@
 @import "tw-animate-css";
 
 :root {
-  --background: oklch(0.975 0.006 235);
-  --foreground: oklch(0.22 0.025 245);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.025 245);
-  --primary: oklch(0.43 0.105 226);
-  --primary-foreground: oklch(0.98 0.008 220);
-  --secondary: oklch(0.93 0.018 225);
-  --secondary-foreground: oklch(0.3 0.055 230);
-  --muted-foreground: oklch(0.5 0.025 240);
-  --border: oklch(0.88 0.018 230);
-  --radius: 0.75rem;
+  color-scheme: dark;
+  --background: #080f1c;
+  --foreground: #e7eff9;
+  --card: #101d30;
+  --card-foreground: #e7eff9;
+  --surface-raised: #162740;
+  --primary: #85c7ff;
+  --primary-foreground: #081525;
+  --secondary: #1b3451;
+  --secondary-foreground: #d0e5fb;
+  --muted-foreground: #9bafc7;
+  --border: #2b4059;
+  --control-border: #627d9e;
+  --ring: #b9e1ff;
+  --success: #7dd3a8;
+  --warning: #f2c879;
+  --danger: #ff9a9a;
+  --radius: 0.5rem;
 }
 
 @theme inline {
@@ -26,6 +33,14 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+  --color-control-border: var(--control-border);
+  --color-surface-raised: var(--surface-raised);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -37,9 +52,12 @@
 }
 
 body {
+  margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* El popup de MapLibre viene con fondo blanco; lo alineamos con la paleta
@@ -47,9 +65,9 @@ body {
    `maplibre-gl.css` se importa después de esta hoja. */
 .vessel-popup .maplibregl-popup-content {
   padding: 0.75rem 0.875rem;
-  border: 1px solid color-mix(in srgb, white 12%, transparent);
-  border-radius: 0.875rem;
-  background: rgb(7 26 44 / 0.95);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
   box-shadow: 0 10px 30px rgb(0 0 0 / 0.45);
   backdrop-filter: blur(4px);
 }
@@ -60,11 +78,57 @@ body {
 
 .vessel-popup .maplibregl-popup-close-button {
   padding: 0 0.35rem;
-  color: rgb(148 163 184);
+  color: var(--muted-foreground);
+  width: 44px;
+  height: 44px;
   font-size: 1rem;
 }
 
 .vessel-popup .maplibregl-popup-close-button:hover {
   background: transparent;
-  color: rgb(226 232 240);
+  color: var(--foreground);
+}
+
+button, input, select { font: inherit; }
+button { cursor: pointer; touch-action: manipulation; }
+button:disabled { cursor: default; opacity: 0.5; }
+button, a, input, select { transition: background-color 150ms, border-color 150ms, color 150ms; }
+:where(button, a, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+::selection { background: var(--secondary); color: var(--foreground); }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.map-tool { position: absolute; top: 80px; z-index: 10; }
+.map-tool-filters { left: 16px; width: 256px; }
+.map-tool-analysis { right: 16px; width: 224px; }
+.map-tool-toggle { display: none; }
+.map-tool-toggle[aria-expanded="true"] { border-color: var(--primary); color: var(--primary); }
+.map-tool-panel { padding: 16px; border: 1px solid var(--control-border); border-radius: 8px; background: var(--card); box-shadow: 0 8px 24px #0004; }
+.map-action { border: 1px solid var(--control-border); border-radius: 6px; min-height: 36px; padding: 6px 10px; }
+.map-action:hover { background: var(--secondary); }
+.map-action[aria-pressed="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 15%, var(--card)); color: var(--primary); }
+.vessel-map .maplibregl-ctrl-group { background: var(--surface-raised); border: 1px solid var(--control-border); border-radius: 6px; }
+.vessel-map .maplibregl-ctrl-group button { width: 36px; height: 36px; }
+.vessel-map .maplibregl-ctrl-group button:hover { background: var(--secondary); }
+.vessel-map .maplibregl-ctrl-icon { filter: invert(1); }
+.vessel-map .maplibregl-ctrl-attrib.maplibregl-ctrl { background: var(--card); color: var(--muted-foreground); font-size: 12px; }
+.vessel-map .maplibregl-ctrl-attrib a { color: var(--primary); }
+.vessel-map .maplibregl-ctrl-attrib-button { filter: invert(1); }
+.vessel-map .maplibregl-ctrl-scale { background: var(--card); color: var(--foreground); border-color: var(--control-border); }
+.vessel-popup .maplibregl-popup-content { padding-top: 36px; }
+
+@media (max-width: 639px) {
+  .map-tool { top: 108px; width: auto; }
+  .map-tool-filters { left: 12px; right: 12px; }
+  .map-tool-analysis { left: 12px; right: 12px; pointer-events: none; }
+  .map-tool-toggle { display: block; min-height: 44px; border: 1px solid var(--control-border); border-radius: 6px; padding: 8px 16px; background: var(--card); color: var(--foreground); }
+  .map-tool-analysis .map-tool-toggle { margin-left: auto; pointer-events: auto; }
+  .map-tool-panel { margin-top: 8px; max-height: 280px; overflow-y: auto; pointer-events: auto; }
+  .map-tool-panel[data-open="false"] { display: none; }
+  .map-action { min-height: 44px; }
+  .vessel-map .maplibregl-ctrl-group button { width: 44px; height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }

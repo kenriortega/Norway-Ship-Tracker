@@ -51,7 +51,7 @@ function escapeHtml(value: string): string {
 }
 
 function renderRow(label: string, value: string): string {
-  return `<div class="flex items-baseline justify-between gap-4"><dt class="text-slate-400">${label}</dt><dd class="font-medium text-slate-100">${escapeHtml(value)}</dd></div>`;
+  return `<div class="flex items-baseline justify-between gap-4"><dt class="text-muted-foreground">${label}</dt><dd class="font-mono font-medium text-foreground">${escapeHtml(value)}</dd></div>`;
 }
 
 /**
@@ -80,7 +80,7 @@ export function renderVesselPopup(
 ): string {
   return [
     '<div class="min-w-[13rem] space-y-2 text-xs">',
-    `<p class="text-sm font-semibold text-cyan-300">${escapeHtml(properties.name)}</p>`,
+    `<p class="pr-4 text-sm font-semibold text-primary">${escapeHtml(properties.name)}</p>`,
     '<dl class="space-y-1">',
     renderRow("MMSI", String(properties.mmsi)),
     renderRow("Tipo", VESSEL_CATEGORY_LABELS[properties.category]),

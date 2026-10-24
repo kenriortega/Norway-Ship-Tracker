@@ -14,6 +14,8 @@ import {
 } from "@/lib/analysis";
 
 interface AnalysisLayersProps {
+  open: boolean;
+  onToggle: () => void;
   map: MapLibreMap | null;
   isMapReady: boolean;
 }
@@ -30,7 +32,7 @@ const POINT_SUFFIX = "-point";
  * punto para encuentros y barcos mudos. Viven fuera de `VesselMap` porque ese
  * componente ya carga con el stream, la interpolación y los filtros.
  */
-export function AnalysisLayers({ map, isMapReady }: AnalysisLayersProps) {
+export function AnalysisLayers({ map, isMapReady, open, onToggle }: AnalysisLayersProps) {
   const [active, setActive] = useState<ReadonlySet<AnalysisLayer>>(() => new Set());
   const [states, setStates] = useState<Record<string, LayerState>>({});
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -121,47 +123,50 @@ export function AnalysisLayers({ map, isMapReady }: AnalysisLayersProps) {
   }
 
   return (
-    <div className="absolute right-4 top-16 z-10 w-44 rounded-2xl border border-white/15 bg-black/55 p-3 text-xs text-slate-100 shadow-lg backdrop-blur">
-      <p className="mb-2 font-medium">Análisis</p>
-      <div className="flex flex-col gap-1.5">
-        {ANALYSIS_LAYERS.map((layer) => {
-          const isActive = active.has(layer);
-          // Una capa recién encendida aún no tiene estado propio: se deriva
-          // aquí en vez de escribirlo desde el efecto, que dispara renders en
-          // cascada.
-          const state = states[layer] ?? "loading";
-          return (
-            <button
-              key={layer}
-              type="button"
-              onClick={() => toggle(layer)}
-              aria-pressed={isActive}
-              className={`flex items-center justify-between gap-2 rounded-full border px-2.5 py-1 text-left transition ${
-                isActive
-                  ? "border-white/40 bg-white/15"
-                  : "border-white/10 bg-white/5 hover:bg-white/10"
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                <span
-                  aria-hidden
-                  className="size-2 rounded-full"
-                  style={{ backgroundColor: ANALYSIS_COLORS[layer] }}
-                />
-                {ANALYSIS_LABELS[layer]}
-              </span>
-              <span className="text-[10px] text-slate-300">
-                {!isActive
-                  ? ""
-                  : state === "loading"
-                    ? "…"
-                    : state === "error"
-                      ? "error"
-                      : (counts[layer] ?? 0)}
-              </span>
-            </button>
-          );
-        })}
+    <div className="map-tool map-tool-analysis text-sm">
+      <button type="button" className="map-tool-toggle" aria-expanded={open} aria-controls="analysis-layers" onClick={onToggle}>Análisis</button>
+      <div id="analysis-layers" className="map-tool-panel" data-open={open}>
+        <p className="mb-2 font-medium">Análisis</p>
+        <div className="flex flex-col gap-1.5">
+          {ANALYSIS_LAYERS.map((layer) => {
+            const isActive = active.has(layer);
+            // Una capa recién encendida aún no tiene estado propio: se deriva
+            // aquí en vez de escribirlo desde el efecto, que dispara renders en
+            // cascada.
+            const state = states[layer] ?? "loading";
+            return (
+              <button
+                key={layer}
+                type="button"
+                onClick={() => toggle(layer)}
+                aria-pressed={isActive}
+                className={`map-action flex w-full items-center justify-between gap-2 text-left text-xs ${
+                  isActive
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: ANALYSIS_COLORS[layer] }}
+                  />
+                  {ANALYSIS_LABELS[layer]}
+                </span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {!isActive
+                    ? ""
+                    : state === "loading"
+                      ? "…"
+                      : state === "error"
+                        ? "error"
+                        : (counts[layer] ?? 0)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

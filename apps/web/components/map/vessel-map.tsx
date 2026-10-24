@@ -42,6 +42,7 @@ import { VesselMapStatus } from "./vessel-map-status";
 const SOURCE_ID = "vessels";
 const CIRCLE_LAYER_ID = "vessels-circles";
 const ARROW_LAYER_ID = "vessels-arrows";
+const SELECTION_LAYER_ID = "vessel-selection";
 const ARROW_ICON_ID = "vessel-arrow";
 const INTERACTIVE_LAYER_IDS = [ARROW_LAYER_ID, CIRCLE_LAYER_ID];
 
@@ -97,12 +98,12 @@ const HEADING_EXPRESSION: RotationExpression = [
   0,
 ];
 
-// Cian en movimiento, ámbar prácticamente detenido. Lo comparten las dos capas.
+// Azul en movimiento, ámbar prácticamente detenido. Lo comparten las dos capas.
 const VESSEL_COLOR_EXPRESSION: ColorExpression = [
   "case",
   ["<", ["coalesce", ["get", "speedOverGround"], 0], 0.5],
-  "#f59e0b",
-  "#22d3ee",
+  "#f2c879",
+  "#85c7ff",
 ];
 const REFRESH_INTERVAL_MS = 20_000;
 
@@ -159,6 +160,7 @@ export function VesselMap() {
   const popupReference = useRef<Popup | null>(null);
   const selectedMmsiReference = useRef<number | null>(null);
 
+  const [mobileTool, setMobileTool] = useState<"filters" | "analysis" | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
   // Las capas de análisis necesitan la instancia durante el render, y un ref
   // no se puede leer ahí sin romper el ciclo de React, así que el mapa vive
@@ -280,6 +282,18 @@ export function VesselMap() {
         },
         paint: {
           "icon-color": VESSEL_COLOR_EXPRESSION,
+        },
+      });
+      map.addLayer({
+        id: SELECTION_LAYER_ID,
+        type: "circle",
+        source: SOURCE_ID,
+        filter: ["==", ["get", "mmsi"], -1],
+        paint: {
+          "circle-radius": 11,
+          "circle-opacity": 0,
+          "circle-stroke-color": "#b9e1ff",
+          "circle-stroke-width": 2,
         },
       });
       // Los listeners van aquí porque `queryRenderedFeatures` lanza si la capa
@@ -531,6 +545,12 @@ export function VesselMap() {
     });
   }, []);
 
+  useEffect(() => {
+    const map = mapReference.current;
+    if (!isMapReady || map === null || !map.getLayer(SELECTION_LAYER_ID)) return;
+    map.setFilter(SELECTION_LAYER_ID, ["==", ["get", "mmsi"], selectedMmsi ?? -1]);
+  }, [isMapReady, selectedMmsi]);
+
   const resetFilters = useCallback(() => {
     setSelectedCategories(new Set(VESSEL_CATEGORIES));
     setMinSpeed(0);
@@ -545,12 +565,18 @@ export function VesselMap() {
   return (
     <section
       aria-label="Mapa de embarcaciones en aguas noruegas"
-      className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#071a2c] shadow-2xl"
+      className="vessel-map relative overflow-hidden rounded-lg border border-border bg-card"
     >
       {/* El CSS de MapLibre fuerza `position: relative` en su contenedor, así
           que la altura va aquí en lugar de un posicionamiento absoluto. */}
-      <div ref={containerReference} className="h-[480px] w-full lg:h-[620px]" />
+      <div ref={containerReference} className="h-[560px] w-full lg:h-[620px]" />
+      <div className="pointer-events-none absolute bottom-16 left-3 flex flex-wrap gap-3 rounded-md border border-control-border bg-card px-3 py-2 text-xs" aria-label="Leyenda de velocidad">
+        <span className="flex items-center gap-2"><i className="size-2 rounded-full bg-primary" aria-hidden="true" />≥ 0,5 kn</span>
+        <span className="flex items-center gap-2"><i className="size-2 rounded-full bg-warning" aria-hidden="true" />&lt; 0,5 kn o sin dato</span>
+      </div>
       <VesselFilters
+        open={mobileTool === "filters"}
+        onToggle={() => setMobileTool((current) => current === "filters" ? null : "filters")}
         selectedCategories={selectedCategories}
         minSpeed={minSpeed}
         onToggleCategory={toggleCategory}
@@ -558,7 +584,12 @@ export function VesselMap() {
         onReset={resetFilters}
         isFiltered={isFiltered}
       />
-      <AnalysisLayers map={mapInstance} isMapReady={isMapReady} />
+      <AnalysisLayers
+        map={mapInstance}
+        isMapReady={isMapReady}
+        open={mobileTool === "analysis"}
+        onToggle={() => setMobileTool((current) => current === "analysis" ? null : "analysis")}
+      />
       <VesselMapStatus
         status={status}
         count={visibleCount}

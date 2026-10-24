@@ -18,7 +18,7 @@ import {
 
 type Status = "loading" | "ready" | "error";
 
-export function VesselDashboard() {
+export function VesselDashboard({ children }: { children: React.ReactNode }) {
   const [stats, setStats] = useState<VesselStatsResponse | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -69,38 +69,44 @@ export function VesselDashboard() {
 
   if (status === "error") {
     return (
-      <section aria-label="Métricas de la flota" role="alert" className="rounded-2xl border border-red-300/60 bg-red-50 p-5">
-        <p className="flex items-center gap-2 text-sm font-medium text-red-900">
-          <AlertTriangle className="size-4" aria-hidden="true" />
-          No se pudieron cargar las métricas
-        </p>
-        <p className="mt-1 text-xs leading-5 text-red-800">{errorMessage}</p>
-        <button
-          type="button"
-          onClick={retry}
-          className="mt-3 rounded-full border border-red-300 px-3 py-1 text-xs font-medium text-red-900 transition hover:bg-red-100"
-        >
-          Reintentar
-        </button>
-      </section>
+      <div className="space-y-4">
+        <section aria-label="Métricas de la flota" role="alert" className="rounded-lg border border-danger/50 bg-danger/10 p-5">
+          <p className="flex items-center gap-2 text-sm font-medium text-danger">
+            <AlertTriangle className="size-4" aria-hidden="true" />
+            No se pudieron cargar las métricas
+          </p>
+          <p className="mt-1 text-xs leading-5 text-danger">{errorMessage}</p>
+          <button
+            type="button"
+            onClick={retry}
+            className="mt-3 min-h-11 rounded-md border border-danger/60 px-3 py-2 text-xs font-medium text-danger transition hover:bg-danger/10"
+          >
+            Reintentar
+          </button>
+        </section>
+        {children}
+      </div>
     );
   }
 
   if (view === null || stats === null) {
     return (
-      <section
-        aria-label="Métricas de la flota"
-        aria-busy="true"
-        className="flex items-center gap-2 rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground"
-      >
-        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-        Cargando métricas…
-      </section>
+      <div className="space-y-4">
+        <section
+          aria-label="Métricas de la flota"
+          aria-busy="true"
+          className="flex items-center gap-2 rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground"
+        >
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          Cargando métricas…
+        </section>
+        {children}
+      </div>
     );
   }
 
   return (
-    <section aria-label="Métricas de la flota" className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
       <StatTiles
         tiles={[
           { label: "Embarcaciones", value: view.totalVessels, hint: "Con posición conocida" },
@@ -110,6 +116,12 @@ export function VesselDashboard() {
         ]}
       />
 
+      {children}
+
+      <div className="mt-2 flex items-center gap-3">
+        <h2 className="eyebrow">Análisis de la flota</h2>
+        <span className="h-px flex-1 bg-border" aria-hidden="true" />
+      </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <CategoryPanel categories={view.categories} />
         <StatusPanel statuses={view.statuses} />
@@ -118,6 +130,6 @@ export function VesselDashboard() {
       </div>
 
       <FreshnessPanel freshness={stats.freshness} coverage={stats.coverage} />
-    </section>
+    </div>
   );
 }

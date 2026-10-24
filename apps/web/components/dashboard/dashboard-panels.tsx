@@ -18,11 +18,11 @@ interface PanelProps {
 
 export function Panel({ title, hint, children }: PanelProps) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="rounded-lg border border-border bg-card p-5">
       <header className="mb-4">
         <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
         {hint === undefined ? null : (
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">{hint}</p>
+          <p className="mt-1 text-sm leading-5 text-muted-foreground">{hint}</p>
         )}
       </header>
       {children}
@@ -39,15 +39,15 @@ interface BarRowProps {
 
 function BarRow({ label, value, total, detail }: BarRowProps) {
   return (
-    <li className="grid grid-cols-[7rem_1fr_auto] items-center gap-3 text-xs">
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-sm sm:grid-cols-[8rem_minmax(0,1fr)_auto]">
       <span className="truncate text-muted-foreground">{label}</span>
-      <span className="h-2 overflow-hidden rounded-full bg-secondary" aria-hidden="true">
+      <span className="col-span-2 row-start-2 h-1 overflow-hidden rounded-full bg-secondary sm:col-span-1 sm:row-auto" aria-hidden="true">
         <span
           className="block h-full rounded-full bg-primary"
           style={{ width: `${percentage(value, total)}%` }}
         />
       </span>
-      <span className="tabular-nums font-medium">
+      <span className="font-mono tabular-nums font-medium">
         {formatInteger(value)}
         {detail === undefined ? null : (
           <span className="ml-2 font-normal text-muted-foreground">{detail}</span>
@@ -98,8 +98,8 @@ export function StatusPanel({ statuses }: { statuses: StatusSlice[] }) {
 export function ActivityPanel({ activity }: { activity: ActivitySample[] }) {
   if (activity.length < 2) {
     return (
-      <Panel title="Pulso del pipeline">
-        <p className="text-xs text-muted-foreground">
+      <Panel title="Actividad AIS">
+        <p className="text-sm text-muted-foreground">
           Aún no hay suficiente historial para dibujar la última hora.
         </p>
       </Panel>
@@ -120,7 +120,7 @@ export function ActivityPanel({ activity }: { activity: ActivitySample[] }) {
   const last = activity[activity.length - 1];
 
   return (
-    <Panel title="Pulso del pipeline" hint="Posiciones recibidas por minuto en la última hora.">
+    <Panel title="Actividad AIS" hint="Posiciones recibidas por minuto en la última hora.">
       <svg
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
@@ -137,7 +137,7 @@ export function ActivityPanel({ activity }: { activity: ActivitySample[] }) {
           className="text-primary"
         />
       </svg>
-      <p className="mt-3 text-xs text-muted-foreground">
+      <p className="mt-3 text-sm text-muted-foreground">
         Último minuto: <span className="font-medium text-foreground">{formatInteger(last.positions)}</span>{" "}
         · máximo {formatInteger(maximum)}
       </p>
@@ -188,7 +188,7 @@ export function FreshnessPanel({ freshness, coverage }: FreshnessPanelProps) {
           <BarRow key={bucket.label} label={bucket.label} value={bucket.value} total={total} />
         ))}
       </ul>
-      <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
+      <p className="mt-4 border-t border-border pt-3 text-sm text-muted-foreground">
         Antena terrestre{" "}
         <span className="font-medium text-foreground">{formatInteger(coverage.terrestrial)}</span> ·
         satélite <span className="font-medium text-foreground">{formatInteger(coverage.satellite)}</span>
@@ -203,15 +203,15 @@ interface StatTilesProps {
 
 export function StatTiles({ tiles }: StatTilesProps) {
   return (
-    <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <dl aria-label="Resumen de la flota" className="grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-card lg:grid-cols-4">
       {tiles.map((tile) => (
-        <div key={tile.label} className="rounded-2xl border border-border bg-card p-5">
-          <dt className="text-xs text-muted-foreground">{tile.label}</dt>
-          <dd className="mt-2 text-3xl font-semibold tabular-nums tracking-tight">
+        <div key={tile.label} className="border-border p-4 odd:border-r [&:nth-child(n+3)]:border-t lg:border-r lg:p-5 lg:last:border-r-0 lg:[&:nth-child(n+3)]:border-t-0">
+          <dt className="text-sm text-muted-foreground">{tile.label}</dt>
+          <dd className="mt-2 text-3xl font-mono font-medium tabular-nums tracking-tight">
             {formatInteger(tile.value)}
           </dd>
           {tile.hint === undefined ? null : (
-            <p className="mt-1 text-xs text-muted-foreground">{tile.hint}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{tile.hint}</p>
           )}
         </div>
       ))}

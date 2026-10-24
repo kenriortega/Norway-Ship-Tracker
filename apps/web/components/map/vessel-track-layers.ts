@@ -16,7 +16,7 @@ const LINE_WIDTH: WidthExpression = ["interpolate", ["linear"], ["zoom"], 4, 1.2
 
 /**
  * El degradado recorre el tramo de lo más antiguo (gris casi transparente) a
- * lo más reciente (cian), que es el mismo cian del barco en movimiento. Como
+ * lo más reciente (azul), que es el mismo azul del barco en movimiento. Como
  * `line-progress` se reinicia en cada feature, el degradado se lee por tramo:
  * a cambio no inventamos una recta sobre los huecos de cobertura.
  */
@@ -25,11 +25,11 @@ const AGE_GRADIENT: NonNullable<LineLayer["paint"]>["line-gradient"] = [
   ["linear"],
   ["line-progress"],
   0,
-  "rgba(125, 211, 252, 0.45)",
+  "rgba(133, 199, 255, 0.45)",
   0.6,
-  "rgba(56, 189, 248, 0.8)",
+  "rgba(133, 199, 255, 0.8)",
   1,
-  "#22d3ee",
+  "#85c7ff",
 ];
 
 /**
