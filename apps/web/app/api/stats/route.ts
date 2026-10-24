@@ -2,14 +2,14 @@ import { getVesselStats } from "@norway-ship-tracker/db";
 import type { VesselStatsResponse } from "@norway-ship-tracker/domain";
 import { NextResponse } from "next/server";
 
-import { getDatabase } from "@/lib/database";
+import { withDatabase } from "@/lib/database";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(): Promise<NextResponse> {
   try {
-    const stats = await getVesselStats(getDatabase());
+    const stats = await withDatabase((database) => getVesselStats(database));
     const payload: VesselStatsResponse = {
       ...stats,
       generatedAt: new Date().toISOString(),

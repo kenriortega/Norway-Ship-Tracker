@@ -2,7 +2,7 @@ import { getPortClusters } from "@norway-ship-tracker/db";
 import type { PortClustersResponse } from "@norway-ship-tracker/domain";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getDatabase } from "@/lib/database";
+import { withDatabase } from "@/lib/database";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -33,11 +33,13 @@ function boundedParameter(
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const parameters = request.nextUrl.searchParams;
-    const clusters = await getPortClusters(getDatabase(), {
-      epsMeters: boundedParameter(parameters, "eps", DEFAULT_EPS_METERS, 100, 20_000),
-      minVessels: boundedParameter(parameters, "minVessels", DEFAULT_MIN_VESSELS, 2, 100),
-      windowHours: boundedParameter(parameters, "windowHours", DEFAULT_WINDOW_HOURS, 1, MAX_WINDOW_HOURS),
-    });
+    const clusters = await withDatabase((database) =>
+      getPortClusters(database, {
+        epsMeters: boundedParameter(parameters, "eps", DEFAULT_EPS_METERS, 100, 20_000),
+        minVessels: boundedParameter(parameters, "minVessels", DEFAULT_MIN_VESSELS, 2, 100),
+        windowHours: boundedParameter(parameters, "windowHours", DEFAULT_WINDOW_HOURS, 1, MAX_WINDOW_HOURS),
+      }),
+    );
 
     const payload: PortClustersResponse = {
       ...clusters,

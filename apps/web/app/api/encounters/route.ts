@@ -2,7 +2,7 @@ import { getEncounters } from "@norway-ship-tracker/db";
 import type { EncountersResponse } from "@norway-ship-tracker/domain";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getDatabase } from "@/lib/database";
+import { withDatabase } from "@/lib/database";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -33,11 +33,13 @@ function boundedParameter(
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const parameters = request.nextUrl.searchParams;
-    const found = await getEncounters(getDatabase(), {
-      maxMeters: boundedParameter(parameters, "meters", DEFAULT_MAX_METERS, 10, 5_000),
-      windowHours: boundedParameter(parameters, "windowHours", DEFAULT_WINDOW_HOURS, 1, MAX_WINDOW_HOURS),
-      minMinutes: boundedParameter(parameters, "minMinutes", DEFAULT_MIN_MINUTES, 0, 1_440),
-    });
+    const found = await withDatabase((database) =>
+      getEncounters(database, {
+        maxMeters: boundedParameter(parameters, "meters", DEFAULT_MAX_METERS, 10, 5_000),
+        windowHours: boundedParameter(parameters, "windowHours", DEFAULT_WINDOW_HOURS, 1, MAX_WINDOW_HOURS),
+        minMinutes: boundedParameter(parameters, "minMinutes", DEFAULT_MIN_MINUTES, 0, 1_440),
+      }),
+    );
 
     const payload: EncountersResponse = {
       ...found,

@@ -2,7 +2,7 @@ import { getDarkVessels } from "@norway-ship-tracker/db";
 import type { DarkVesselsResponse } from "@norway-ship-tracker/domain";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getDatabase } from "@/lib/database";
+import { withDatabase } from "@/lib/database";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,10 +28,12 @@ function boundedParameter(
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const parameters = request.nextUrl.searchParams;
-    const dark = await getDarkVessels(getDatabase(), {
-      thresholdMinutes: boundedParameter(parameters, "minutes", DEFAULT_THRESHOLD_MINUTES, 5, 2_880),
-      minSpeed: boundedParameter(parameters, "minSpeed", DEFAULT_MIN_SPEED, 0, 50),
-    });
+    const dark = await withDatabase((database) =>
+      getDarkVessels(database, {
+        thresholdMinutes: boundedParameter(parameters, "minutes", DEFAULT_THRESHOLD_MINUTES, 5, 2_880),
+        minSpeed: boundedParameter(parameters, "minSpeed", DEFAULT_MIN_SPEED, 0, 50),
+      }),
+    );
 
     const payload: DarkVesselsResponse = {
       ...dark,

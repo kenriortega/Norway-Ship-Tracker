@@ -74,10 +74,18 @@ la caché, cinco peticiones seguidas a rutas distintas responden 200.
 De aquí sale que **Hyperdrive no es opcional**. No está solo para poolear: sin
 él no hay dónde apoyar la conexión entre peticiones.
 
+**Arreglado.** `getDatabase()` pasó a ser `withDatabase(work)`, que abre una
+conexión, ejecuta y la cierra en un `finally`. El cierre no es cosmético:
+sin él se cambia el cuelgue por una fuga de un socket por petición. Las cinco
+rutas que consultaban la base pasan ahora por ahí. Verificado con quince
+peticiones seguidas a las cinco rutas: todas 200, con datos, y las trazas del
+runtime en `ok`.
+
 ## Lo que queda
 
-1. Reescribir `lib/database.ts` para crear el cliente por petición desde el
-   binding de Hyperdrive.
+1. Apuntar `withDatabase` al binding de Hyperdrive en vez de a
+   `process.env.DATABASE_URL`. La forma ya es la correcta; cambia la fuente de
+   la cadena de conexión.
 2. TLS en el Postgres de `infra-common`, que Hyperdrive exige y hoy no tiene.
 3. Túnel y configuración de Hyperdrive, con su caché desactivada.
 4. Desplegar, y decidir qué pasa con `vercel.json`.
@@ -87,3 +95,10 @@ De aquí sale que **Hyperdrive no es opcional**. No está solo para poolear: sin
 - `@cloudflare/vite-plugin` y `cf` entran en versión **beta**.
 - `vinext init` subió React de `19.2.8` fijado a `^19.3.1`. Es un cambio de
   versión menor y de fijado a rango, no solo una adición.
+- En desarrollo, workerd registra `eval() is not supported in this
+  environment. React requires eval() in development mode`. La página sirve
+  igual, en 200, pero conviene saber que ese aviso sale y no es un fallo de la
+  aplicación.
+- Abrir y cerrar una conexión por petición cuesta latencia frente al singleton
+  que había. Es el precio de que funcione, y con Hyperdrive delante la conexión
+  pasa a ser contra su proxy local, que es barata.

@@ -2,7 +2,7 @@ import { getLatestVessels, type VesselBounds } from "@norway-ship-tracker/db";
 import type { VesselPositionsResponse } from "@norway-ship-tracker/domain";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getDatabase } from "@/lib/database";
+import { withDatabase } from "@/lib/database";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -53,7 +53,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const bounds = parseBounds(request.nextUrl.searchParams);
     const requestedLimit = numberParameter(request.nextUrl.searchParams, "limit", 5_000);
     const limit = Math.max(1, Math.min(Math.trunc(requestedLimit), 10_000));
-    const vessels = await getLatestVessels(getDatabase(), bounds, limit);
+    const vessels = await withDatabase((database) =>
+      getLatestVessels(database, bounds, limit),
+    );
     const payload: VesselPositionsResponse = {
       vessels,
       count: vessels.length,
