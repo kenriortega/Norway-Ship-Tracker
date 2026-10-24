@@ -6,3 +6,9 @@ target
 captures
 data
 *.log
+**/node_modules
+**/.next
+**/.cloudflare
+**/dist
+**/.dev.vars
+.env.*
