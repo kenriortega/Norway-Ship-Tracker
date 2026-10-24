@@ -13,6 +13,9 @@ out/
 npm-debug.log*
 pnpm-debug.log*
 
+# Binario compilado del worker (ver el script dev:ingestor)
+apps/ingestor-go/bin/
+
 # Local data and captures
 data/
 captures/

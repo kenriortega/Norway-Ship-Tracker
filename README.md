@@ -47,8 +47,10 @@ Requiere Node.js 20 o superior, Go 1.25 o superior, Docker y npm.
    npm run dev:ingestor
    ```
 
-   El atajo entra en `apps/ingestor-go` y ejecuta `go run ./cmd/ingestor`; el
-   worker no es un workspace de npm, pero el comando se conserva.
+   El atajo entra en `apps/ingestor-go`, compila el binario en `bin/` y lo
+   ejecuta. Compila en lugar de usar `go run` porque `go run` lanza el worker
+   como proceso hijo y no le reenvía las señales: un Ctrl+C mataría al wrapper
+   y dejaría al worker ingiriendo.
 
 6. Inicia Next.js en otra terminal:
 

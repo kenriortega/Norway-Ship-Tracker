@@ -9,7 +9,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "dev:web": "npm run dev --workspace @norway-ship-tracker/web",
-    "dev:ingestor": "cd apps/ingestor-go && go run ./cmd/ingestor",
+    "dev:ingestor": "cd apps/ingestor-go && go build -o bin/ingestor ./cmd/ingestor && exec bin/ingestor",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "echo 'Las pruebas del worker viven en apps/ingestor-go: cd apps/ingestor-go && go test ./...' && npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
