@@ -6,6 +6,6 @@ export default defineConfig([
   ...nextVitals,
   ...nextTypescript,
   // `public/maplibre-gl-worker.mjs` es una copia generada de una dependencia.
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "public/**"]),
+  globalIgnores([".next/**", ".cloudflare/**", "dist/**", "out/**", "build/**", "next-env.d.ts", "public/**"]),
 ]);
 
