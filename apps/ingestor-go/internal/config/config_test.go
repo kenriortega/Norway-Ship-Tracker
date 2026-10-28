@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -151,10 +152,16 @@ func TestLoadProbeRejectsNonPositiveIntegers(t *testing.T) {
 	for _, name := range []string{"HEALTH_PORT", "HEALTH_MAX_SILENCE_SECONDS"} {
 		for _, value := range []string{"0", "-5", "abc"} {
 			t.Run(name+"="+value, func(t *testing.T) {
+				t.Setenv("HEALTH_PORT", "3001")
+				t.Setenv("HEALTH_MAX_SILENCE_SECONDS", "300")
 				t.Setenv(name, value)
 
-				if _, err := LoadProbe(); err == nil {
-					t.Errorf("se esperaba un error por %s=%s", name, value)
+				_, err := LoadProbe()
+				if err == nil {
+					t.Fatalf("se esperaba un error por %s=%s", name, value)
+				}
+				if !strings.Contains(err.Error(), name) {
+					t.Errorf("el error debía nombrar %s: %v", name, err)
 				}
 			})
 		}

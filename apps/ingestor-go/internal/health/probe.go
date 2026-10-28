@@ -45,9 +45,22 @@ func Probe(ctx context.Context, port int, maxSilence time.Duration, now time.Tim
 	if state.LastMessageAt == nil {
 		return fmt.Errorf("health: todavía no ha entrado ninguna posición")
 	}
+	// isoLayout es lo que escribe el worker, y va primero. RFC3339 es
+	// tolerancia y no contrato: hoy no hay ningún productor que emita
+	// desplazamiento, pero una marca válida con +00:00 no debe dejar el
+	// contenedor unhealthy para siempre.
 	last, err := time.Parse(isoLayout, *state.LastMessageAt)
 	if err != nil {
-		return fmt.Errorf("health: lastMessageAt ilegible %q: %w", *state.LastMessageAt, err)
+		var retryErr error
+		if last, retryErr = time.Parse(time.RFC3339, *state.LastMessageAt); retryErr != nil {
+			return fmt.Errorf("health: lastMessageAt ilegible %q: %w", *state.LastMessageAt, err)
+		}
+	}
+	// Sin tope por arriba, un reloj desbocado o una marca en hora local
+	// etiquetada con Z dejarían el contenedor sano con la ingestión parada.
+	if last.After(now.Add(maxSilence)) {
+		return fmt.Errorf("health: lastMessageAt está %d s en el futuro, el reloj o el formato no cuadran",
+			int(last.Sub(now).Seconds()))
 	}
 	if last.Before(now.Add(-maxSilence)) {
 		return fmt.Errorf("health: último mensaje hace %d s, el máximo es %d s",
