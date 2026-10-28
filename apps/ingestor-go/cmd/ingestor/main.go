@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/kenriortega/Norway-Ship-Tracker/apps/ingestor-go/internal/barentswatch"
 	"github.com/kenriortega/Norway-Ship-Tracker/apps/ingestor-go/internal/config"
@@ -53,10 +54,41 @@ func describeError(err error) string {
 }
 
 func main() {
+	// La imagen final es `scratch`: no hay shell, curl ni wget, y este binario
+	// es el único ejecutable que hay dentro. El subcomando existe para que el
+	// healthcheck del compose pueda consultar el /health local sin ellos.
+	// Sin argumentos, el arranque es el de siempre.
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(runHealthcheck())
+	}
+
+	// Cualquier otro argumento se anota y se ignora, y el arranque sigue. Salir
+	// con error aquí convertiría un `command:` mal puesto en el compose en un
+	// bucle de reinicios callado, porque el servicio lleva
+	// `restart: unless-stopped` y nadie mira los reinicios de un worker que
+	// siempre estuvo arriba.
+	if len(os.Args) > 1 {
+		info(map[string]any{"event": "unknown_command_ignored", "command": os.Args[1]})
+	}
+
 	if err := run(); err != nil {
 		fail(map[string]any{"event": "ingestor_failed", "error": describeError(err)})
 		os.Exit(1)
 	}
+}
+
+// runHealthcheck consulta el /health local y devuelve el código de salida. Solo
+// 0 o 1: Docker reserva el 2 y documenta que no se use.
+func runHealthcheck() int {
+	probe, err := config.LoadProbe()
+	if err == nil {
+		err = health.Probe(context.Background(), probe.HealthPort, probe.MaxSilence, time.Now())
+	}
+	if err != nil {
+		fail(map[string]any{"event": "healthcheck_failed", "error": describeError(err)})
+		return 1
+	}
+	return 0
 }
 
 func run() error {

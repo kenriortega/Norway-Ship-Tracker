@@ -30,6 +30,10 @@ type Config struct {
 	HealthPort           int
 }
 
+// defaultHealthPort lo comparten Load y LoadProbe: la sonda tiene que consultar
+// el mismo puerto en el que el worker abre su /health.
+const defaultHealthPort = 3_001
+
 func required(name string) (string, error) {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
@@ -117,9 +121,37 @@ func Load() (Config, error) {
 	}
 	config.MaxBackoff = time.Duration(maxMs) * time.Millisecond
 
-	if config.HealthPort, err = positiveInteger("HEALTH_PORT", 3_001); err != nil {
+	if config.HealthPort, err = positiveInteger("HEALTH_PORT", defaultHealthPort); err != nil {
 		return Config{}, err
 	}
 
 	return config, nil
+}
+
+// ProbeConfig es lo que necesita el subcomando de sonda. Aparte de Load()
+// porque la sonda no habla con la base ni con BarentsWatch: pedirle
+// DATABASE_URL para consultar un endpoint local la haría fallar por una razón
+// que no tiene nada que ver con la salud del worker.
+type ProbeConfig struct {
+	HealthPort int
+	MaxSilence time.Duration
+}
+
+// LoadProbe lee solo el puerto de salud y el silencio máximo tolerado entre
+// dos mensajes. HEALTH_MAX_SILENCE_SECONDS queda junto a HEALTH_PORT y fuera de
+// la familia AIS_*, que es la que se comparte con el ingestor de TypeScript.
+func LoadProbe() (ProbeConfig, error) {
+	var probe ProbeConfig
+	var err error
+
+	if probe.HealthPort, err = positiveInteger("HEALTH_PORT", defaultHealthPort); err != nil {
+		return ProbeConfig{}, err
+	}
+	seconds, err := positiveInteger("HEALTH_MAX_SILENCE_SECONDS", 300)
+	if err != nil {
+		return ProbeConfig{}, err
+	}
+	probe.MaxSilence = time.Duration(seconds) * time.Second
+
+	return probe, nil
 }

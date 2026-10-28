@@ -113,3 +113,50 @@ func TestLoadOverridesFromEnvironment(t *testing.T) {
 		t.Errorf("scope = %q", settings.Scope)
 	}
 }
+
+func TestLoadProbeDefaultsWithoutCredentials(t *testing.T) {
+	// La sonda no debe exigir nada de lo que exige Load.
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("BARENTSWATCH_CLIENT_ID", "")
+	t.Setenv("BARENTSWATCH_CLIENT_SECRET", "")
+	t.Setenv("HEALTH_PORT", "")
+	t.Setenv("HEALTH_MAX_SILENCE_SECONDS", "")
+
+	probe, err := LoadProbe()
+	if err != nil {
+		t.Fatalf("LoadProbe devolvió error: %v", err)
+	}
+	if probe.HealthPort != 3001 {
+		t.Errorf("puerto = %d", probe.HealthPort)
+	}
+	if probe.MaxSilence != 300*time.Second {
+		t.Errorf("silencio máximo = %v", probe.MaxSilence)
+	}
+}
+
+func TestLoadProbeOverridesFromEnvironment(t *testing.T) {
+	t.Setenv("HEALTH_PORT", "4010")
+	t.Setenv("HEALTH_MAX_SILENCE_SECONDS", "90")
+
+	probe, err := LoadProbe()
+	if err != nil {
+		t.Fatalf("LoadProbe devolvió error: %v", err)
+	}
+	if probe.HealthPort != 4010 || probe.MaxSilence != 90*time.Second {
+		t.Errorf("sonda = %+v", probe)
+	}
+}
+
+func TestLoadProbeRejectsNonPositiveIntegers(t *testing.T) {
+	for _, name := range []string{"HEALTH_PORT", "HEALTH_MAX_SILENCE_SECONDS"} {
+		for _, value := range []string{"0", "-5", "abc"} {
+			t.Run(name+"="+value, func(t *testing.T) {
+				t.Setenv(name, value)
+
+				if _, err := LoadProbe(); err == nil {
+					t.Errorf("se esperaba un error por %s=%s", name, value)
+				}
+			})
+		}
+	}
+}

@@ -106,6 +106,11 @@ go run ./cmd/ingestor
 Lee el `.env` de la raíz a través del entorno y expone `/health` en su propio
 puerto. En marcha ocupa unos 13 MB de RSS y su imagen son 10,5 MB.
 
+`ingestor healthcheck` consulta el `/health` local y sale con 0 o 1; falla si el
+stream está caído o si el último mensaje tiene más de
+`HEALTH_MAX_SILENCE_SECONDS` (300 por defecto). Es lo que usa el `healthcheck`
+del compose, porque la imagen no trae shell ni curl.
+
 Las pruebas de integración necesitan PostgreSQL con PostGIS y el esquema ya
 migrado. Sin `SHIPS_TEST_DATABASE_URL` se saltan:
 
